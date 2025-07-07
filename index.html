@@ -386,6 +386,7 @@
         // State management
         let players = [];
         let grid = {}; // grid[card][player] = state (0=unknown, 1=has, -1=doesn't have, 2=maybe)
+        let maybeSets = {}; // maybeSets[player] = array of sets, each set = { cards: [...], id: uniqueId }
         let suggestions = [];
         let solution = null;
 
@@ -394,6 +395,7 @@
             const state = {
                 players: players,
                 grid: grid,
+                maybeSets: maybeSets,
                 suggestions: suggestions
             };
             
@@ -448,6 +450,7 @@
                 if (state) {
                     players = state.players || [];
                     grid = state.grid || {};
+                    maybeSets = state.maybeSets || {};
                     suggestions = state.suggestions || [];
                     
                     // Initialize grid for any missing players or cards
@@ -568,6 +571,11 @@
                     grid[card][playerName] = 0; // unknown
                 }
             });
+            
+            // Initialize maybeSets for the player
+            if (!maybeSets[playerName]) {
+                maybeSets[playerName] = [];
+            }
         }
 
         function updatePlayersDisplay() {
@@ -681,7 +689,7 @@
                     players.forEach(player => {
                         const state = grid[card] && grid[card][player] !== undefined ? grid[card][player] : 0;
                         const cellClass = getCellClass(state);
-                        const cellSymbol = getCellSymbol(state);
+                        const cellSymbol = getCellSymbol(state, card, player);
                         
                         rowHtml += `<td><div class="cell ${cellClass}" onclick="toggleCell('${card}', '${player}')">${cellSymbol}</div></td>`;
                     });
@@ -701,11 +709,19 @@
             }
         }
 
-        function getCellSymbol(state) {
+        function getCellSymbol(state, card, player) {
             switch(state) {
                 case 1: return '✓';
                 case -1: return '✗';
-                case 2: return '?';
+                case 2: 
+                    // Find which set this card belongs to
+                    if (maybeSets[player]) {
+                        const setIndex = maybeSets[player].findIndex(set => set.cards.includes(card));
+                        if (setIndex !== -1) {
+                            return `?${setIndex + 1}`;
+                        }
+                    }
+                    return '?';
                 default: return '';
             }
         }
@@ -834,16 +850,31 @@
                     });
                 } else {
                     // We don't know which card, but they have at least one
-                    suggestedCards.forEach(card => {
-                        if (grid[card] && grid[card][revealer] === -1) {
-                            // Already marked as doesn't have, leave it
-                        } else if (grid[card] && grid[card][revealer] === 1) {
-                            // Already marked as has, leave it
-                        } else {
-                            // Mark as maybe
-                            setGridState(card, revealer, 2);
-                        }
+                    // Create a maybe set instead of marking individual cards
+                    const eligibleCards = suggestedCards.filter(card => {
+                        return !(grid[card] && grid[card][revealer] === -1) && 
+                               !(grid[card] && grid[card][revealer] === 1);
                     });
+                    
+                    if (eligibleCards.length > 0) {
+                        // Create a new maybe set
+                        const setId = Date.now() + Math.random(); // Simple unique ID
+                        const newSet = {
+                            id: setId,
+                            cards: eligibleCards
+                        };
+                        
+                        // Add to player's maybe sets
+                        if (!maybeSets[revealer]) {
+                            maybeSets[revealer] = [];
+                        }
+                        maybeSets[revealer].push(newSet);
+                        
+                        // Mark the cards as maybe (state 2) for display purposes
+                        eligibleCards.forEach(card => {
+                            setGridState(card, revealer, 2);
+                        });
+                    }
                 }
             }
             
@@ -861,7 +892,50 @@
             if (!grid[card]) {
                 grid[card] = {};
             }
+            
+            const oldState = grid[card][player];
             grid[card][player] = state;
+            
+            // Update maybe sets when state changes
+            if (oldState === 2 && state !== 2) {
+                // Card is no longer maybe, remove from sets
+                removeMaybeCardFromSets(card, player);
+            } else if (oldState !== 1 && state === 1) {
+                // Card is now definitely has, clean up sets
+                cleanupSetsForPlayer(player, card);
+            }
+        }
+        
+        function removeMaybeCardFromSets(card, player) {
+            if (!maybeSets[player]) return;
+            
+            maybeSets[player].forEach((set, setIndex) => {
+                const cardIndex = set.cards.indexOf(card);
+                if (cardIndex !== -1) {
+                    set.cards.splice(cardIndex, 1);
+                }
+            });
+            
+            // Remove empty sets
+            maybeSets[player] = maybeSets[player].filter(set => set.cards.length > 0);
+        }
+        
+        function cleanupSetsForPlayer(player, definiteCard) {
+            if (!maybeSets[player]) return;
+            
+            // Find sets containing this card and remove other cards from those sets
+            const setsToUpdate = maybeSets[player].filter(set => set.cards.includes(definiteCard));
+            
+            setsToUpdate.forEach(set => {
+                set.cards.forEach(card => {
+                    if (card !== definiteCard && grid[card] && grid[card][player] === 2) {
+                        setGridState(card, player, -1); // Mark as doesn't have
+                    }
+                });
+            });
+            
+            // Remove sets that contained this card
+            maybeSets[player] = maybeSets[player].filter(set => !set.cards.includes(definiteCard));
         }
 
         function runEliminationLogic() {
@@ -906,6 +980,24 @@
                             }
                         });
                     }
+                });
+                
+                // Set-based elimination logic
+                players.forEach(player => {
+                    if (!maybeSets[player]) return;
+                    
+                    maybeSets[player].forEach(set => {
+                        // Count how many cards in this set are still possible
+                        const possibleCards = set.cards.filter(card => 
+                            grid[card] && grid[card][player] === 2
+                        );
+                        
+                        if (possibleCards.length === 1) {
+                            // Only one card left in the set, so they must have it
+                            setGridState(possibleCards[0], player, 1);
+                            changed = true;
+                        }
+                    });
                 });
             }
         }
