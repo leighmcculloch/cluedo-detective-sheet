@@ -93,23 +93,40 @@
             gap: 5px;
         }
 
+        .player-tag .player-controls {
+            display: flex;
+            align-items: center;
+            gap: 3px;
+        }
+
+        .player-tag .reorder-btn,
         .player-tag .remove-btn {
             background: none;
             border: none;
             color: white;
             cursor: pointer;
-            font-size: 14px;
+            font-size: 12px;
             padding: 0;
-            width: 20px;
-            height: 20px;
+            width: 18px;
+            height: 18px;
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
         }
 
+        .player-tag .remove-btn {
+            font-size: 14px;
+        }
+
+        .player-tag .reorder-btn:hover,
         .player-tag .remove-btn:hover {
             background-color: rgba(255,255,255,0.2);
+        }
+
+        .player-tag .reorder-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
         }
 
         .detective-sheet {
@@ -515,6 +532,34 @@
             }
         }
 
+        function movePlayerUp(index) {
+            if (index > 0) {
+                // Swap with the previous player
+                const temp = players[index];
+                players[index] = players[index - 1];
+                players[index - 1] = temp;
+                
+                updatePlayersDisplay();
+                updateDetectiveSheet();
+                updatePlayerSelects();
+                updateURL();
+            }
+        }
+
+        function movePlayerDown(index) {
+            if (index < players.length - 1) {
+                // Swap with the next player
+                const temp = players[index];
+                players[index] = players[index + 1];
+                players[index + 1] = temp;
+                
+                updatePlayersDisplay();
+                updateDetectiveSheet();
+                updatePlayerSelects();
+                updateURL();
+            }
+        }
+
         function initializeGridForPlayer(playerName) {
             const allCards = [...gameData.people, ...gameData.weapons, ...gameData.rooms];
             allCards.forEach(card => {
@@ -531,12 +576,16 @@
             const playersList = document.getElementById('playersList');
             playersList.innerHTML = '';
             
-            players.forEach(player => {
+            players.forEach((player, index) => {
                 const playerTag = document.createElement('div');
                 playerTag.className = 'player-tag';
                 playerTag.innerHTML = `
                     <span>${player}</span>
-                    <button class="remove-btn" onclick="removePlayer('${player}')" title="Remove player">×</button>
+                    <div class="player-controls">
+                        <button class="reorder-btn" onclick="movePlayerUp(${index})" title="Move up" ${index === 0 ? 'disabled' : ''}>▲</button>
+                        <button class="reorder-btn" onclick="movePlayerDown(${index})" title="Move down" ${index === players.length - 1 ? 'disabled' : ''}>▼</button>
+                        <button class="remove-btn" onclick="removePlayer('${player}')" title="Remove player">×</button>
+                    </div>
                 `;
                 playersList.appendChild(playerTag);
             });
