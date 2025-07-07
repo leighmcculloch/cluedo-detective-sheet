@@ -935,11 +935,16 @@
                 case 1: return '✓';
                 case -1: return '✗';
                 case 2: 
-                    // Find which set this card belongs to
+                    // Find which sets this card belongs to
                     if (maybeSets[player]) {
-                        const setIndex = maybeSets[player].findIndex(set => set.cards.includes(card));
-                        if (setIndex !== -1) {
-                            return `?${setIndex + 1}`;
+                        const setIndices = [];
+                        maybeSets[player].forEach((set, index) => {
+                            if (set.cards.includes(card)) {
+                                setIndices.push(index + 1);
+                            }
+                        });
+                        if (setIndices.length > 0) {
+                            return `?${setIndices.join(',')}`;
                         }
                     }
                     return '?';
