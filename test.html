@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cluedo Detective Logic Tests</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        h1, h2 {
+            color: #8B4513;
+            border-bottom: 2px solid #8B4513;
+            padding-bottom: 10px;
+        }
+        .test-case {
+            border: 1px solid #ddd;
+            margin: 15px 0;
+            padding: 15px;
+            border-radius: 5px;
+            background-color: #fafafa;
+        }
+        .test-case h3 {
+            margin-top: 0;
+            color: #333;
+        }
+        .test-result {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+        .test-pass {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .test-fail {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .test-details {
+            font-family: monospace;
+            background-color: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+            white-space: pre-wrap;
+            margin: 10px 0;
+        }
+        .summary {
+            font-size: 1.2em;
+            text-align: center;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+        }
+        .summary-pass {
+            background-color: #d4edda;
+            color: #155724;
+            border: 2px solid #c3e6cb;
+        }
+        .summary-fail {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 2px solid #f5c6cb;
+        }
+        .grid-display {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+            gap: 10px;
+            margin: 10px 0;
+        }
+        .grid-item {
+            padding: 5px;
+            background-color: #e9ecef;
+            border-radius: 3px;
+            text-align: center;
+            font-size: 0.9em;
+        }
+        .has { background-color: #d4edda; }
+        .doesnt-have { background-color: #f8d7da; }
+        .maybe { background-color: #fff3cd; }
+        .unknown { background-color: #e9ecef; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Cluedo Detective Logic Tests</h1>
+        <p>This page tests the detective logic to ensure it makes conservative deductions and doesn't make too many assumptions.</p>
+        <div id="test-summary"></div>
+        <div id="test-results"></div>
+    </div>
+
+    <script src="detective-logic.js"></script>
+    <script>
+        // Test framework
+        class TestRunner {
+            constructor() {
+                this.tests = [];
+                this.passed = 0;
+                this.failed = 0;
+            }
+
+            addTest(name, description, testFunction) {
+                this.tests.push({
+                    name,
+                    description,
+                    testFunction
+                });
+            }
+
+            runTests() {
+                const resultsDiv = document.getElementById('test-results');
+                resultsDiv.innerHTML = '';
+
+                this.tests.forEach(test => {
+                    const testDiv = document.createElement('div');
+                    testDiv.className = 'test-case';
+                    
+                    const testTitle = document.createElement('h3');
+                    testTitle.textContent = test.name;
+                    testDiv.appendChild(testTitle);
+
+                    const testDesc = document.createElement('p');
+                    testDesc.textContent = test.description;
+                    testDiv.appendChild(testDesc);
+
+                    try {
+                        const result = test.testFunction();
+                        if (result.success) {
+                            this.passed++;
+                            const passDiv = document.createElement('div');
+                            passDiv.className = 'test-result test-pass';
+                            passDiv.textContent = '✓ PASS';
+                            testDiv.appendChild(passDiv);
+                        } else {
+                            this.failed++;
+                            const failDiv = document.createElement('div');
+                            failDiv.className = 'test-result test-fail';
+                            failDiv.textContent = '✗ FAIL';
+                            testDiv.appendChild(failDiv);
+
+                            const detailsDiv = document.createElement('div');
+                            detailsDiv.className = 'test-details';
+                            detailsDiv.textContent = result.message;
+                            testDiv.appendChild(detailsDiv);
+                        }
+
+                        if (result.debug) {
+                            const debugDiv = document.createElement('div');
+                            debugDiv.className = 'test-details';
+                            debugDiv.textContent = result.debug;
+                            testDiv.appendChild(debugDiv);
+                        }
+                    } catch (error) {
+                        this.failed++;
+                        const errorDiv = document.createElement('div');
+                        errorDiv.className = 'test-result test-fail';
+                        errorDiv.textContent = '✗ ERROR';
+                        testDiv.appendChild(errorDiv);
+
+                        const detailsDiv = document.createElement('div');
+                        detailsDiv.className = 'test-details';
+                        detailsDiv.textContent = error.message;
+                        testDiv.appendChild(detailsDiv);
+                    }
+
+                    resultsDiv.appendChild(testDiv);
+                });
+
+                this.updateSummary();
+            }
+
+            updateSummary() {
+                const summaryDiv = document.getElementById('test-summary');
+                const total = this.passed + this.failed;
+                const passRate = Math.round((this.passed / total) * 100);
+
+                summaryDiv.innerHTML = `
+                    <div class="summary ${this.failed === 0 ? 'summary-pass' : 'summary-fail'}">
+                        <strong>Test Results: ${this.passed}/${total} tests passed (${passRate}%)</strong>
+                    </div>
+                `;
+            }
+        }
+
+        // Test utilities
+        function expectState(grid, card, player, expectedState, message) {
+            const actualState = grid[card][player];
+            if (actualState !== expectedState) {
+                throw new Error(`${message}: Expected ${card} for ${player} to be ${expectedState}, got ${actualState}`);
+            }
+        }
+
+        function expectNotState(grid, card, player, unexpectedState, message) {
+            const actualState = grid[card][player];
+            if (actualState === unexpectedState) {
+                throw new Error(`${message}: Expected ${card} for ${player} NOT to be ${unexpectedState}, but it was`);
+            }
+        }
+
+        function stateToString(state) {
+            switch(state) {
+                case DetectiveLogic.CARD_STATES.UNKNOWN: return 'UNKNOWN';
+                case DetectiveLogic.CARD_STATES.HAS: return 'HAS';
+                case DetectiveLogic.CARD_STATES.DOESNT_HAVE: return 'DOESNT_HAVE';
+                case DetectiveLogic.CARD_STATES.MAYBE: return 'MAYBE';
+                default: return 'INVALID';
+            }
+        }
+
+        // Initialize test runner
+        const runner = new TestRunner();
+
+        // Test Case 1: Basic suggestion processing
+        runner.addTest(
+            "Basic Known Card Revelation",
+            "When a player reveals a specific card, they should be marked as having it and not having the others",
+            function() {
+                const inputs = {
+                    players: ['Alice', 'Bob', 'Charlie'],
+                    suggestions: [
+                        {
+                            suggester: 'Alice',
+                            cards: ['Miss Scarlet', 'Knife', 'Kitchen'],
+                            revealer: 'Bob',
+                            revealedCard: 'Miss Scarlet'
+                        }
+                    ]
+                };
+
+                const result = DetectiveLogic.processDetectiveSheet(inputs);
+                
+                // Bob should have Miss Scarlet
+                expectState(result.grid, 'Miss Scarlet', 'Bob', DetectiveLogic.CARD_STATES.HAS, 
+                    "Bob should have Miss Scarlet since he revealed it");
+                
+                // Bob should NOT have the other suggested cards
+                expectState(result.grid, 'Knife', 'Bob', DetectiveLogic.CARD_STATES.DOESNT_HAVE, 
+                    "Bob should not have Knife since he revealed Miss Scarlet");
+                expectState(result.grid, 'Kitchen', 'Bob', DetectiveLogic.CARD_STATES.DOESNT_HAVE, 
+                    "Bob should not have Kitchen since he revealed Miss Scarlet");
+
+                return { success: true };
+            }
+        );
+
+        // Test Case 2: Everyone passes
+        runner.addTest(
+            "Everyone Passes Scenario",
+            "When everyone passes on a suggestion, all players except the suggester should be marked as not having any of the cards",
+            function() {
+                const inputs = {
+                    players: ['Alice', 'Bob', 'Charlie'],
+                    suggestions: [
+                        {
+                            suggester: 'Alice',
+                            cards: ['Miss Scarlet', 'Knife', 'Kitchen'],
+                            revealer: 'pass'
+                        }
+                    ]
+                };
+
+                const result = DetectiveLogic.processDetectiveSheet(inputs);
+                
+                // Bob and Charlie should not have any of the suggested cards
+                expectState(result.grid, 'Miss Scarlet', 'Bob', DetectiveLogic.CARD_STATES.DOESNT_HAVE, 
+                    "Bob should not have Miss Scarlet when everyone passes");
+                expectState(result.grid, 'Knife', 'Charlie', DetectiveLogic.CARD_STATES.DOESNT_HAVE, 
+                    "Charlie should not have Knife when everyone passes");
+
+                // Alice (suggester) should remain unknown for these cards
+                expectState(result.grid, 'Miss Scarlet', 'Alice', DetectiveLogic.CARD_STATES.UNKNOWN, 
+                    "Alice should remain unknown for Miss Scarlet");
+
+                return { success: true };
+            }
+        );
+
+        // Test Case 3: Conservative elimination - should NOT make assumptions
+        runner.addTest(
+            "Conservative Elimination - No Premature Assumptions",
+            "The logic should NOT mark a player as having a card just because they might have it",
+            function() {
+                const inputs = {
+                    players: ['Alice', 'Bob', 'Charlie'],
+                    suggestions: [
+                        {
+                            suggester: 'Alice',
+                            cards: ['Miss Scarlet', 'Knife', 'Kitchen'],
+                            revealer: 'Bob'
+                            // No revealedCard specified - we don't know which card Bob revealed
+                        }
+                    ]
+                };
+
+                const result = DetectiveLogic.processDetectiveSheet(inputs);
+                
+                // Bob should have MAYBE state for all suggested cards, not definitively HAS
+                expectState(result.grid, 'Miss Scarlet', 'Bob', DetectiveLogic.CARD_STATES.MAYBE, 
+                    "Bob should have MAYBE for Miss Scarlet, not definitively HAS");
+                expectState(result.grid, 'Knife', 'Bob', DetectiveLogic.CARD_STATES.MAYBE, 
+                    "Bob should have MAYBE for Knife, not definitively HAS");
+                expectState(result.grid, 'Kitchen', 'Bob', DetectiveLogic.CARD_STATES.MAYBE, 
+                    "Bob should have MAYBE for Kitchen, not definitively HAS");
+
+                return { success: true };
+            }
+        );
+
+        // Test Case 4: Only definitive when no other choice
+        runner.addTest(
+            "Only Definitive When No Other Choice",
+            "A player should only be marked as having a card when they're the only possible owner",
+            function() {
+                const inputs = {
+                    players: ['Alice', 'Bob'],
+                    suggestions: [
+                        {
+                            suggester: 'Alice',
+                            cards: ['Miss Scarlet'],
+                            revealer: 'pass'
+                        }
+                    ],
+                    manualOverrides: {
+                        // Manually mark Alice as not having Miss Scarlet to make it clear it's in the solution
+                        'Miss Scarlet': { 'Alice': DetectiveLogic.CARD_STATES.DOESNT_HAVE }
+                    }
+                };
+
+                const result = DetectiveLogic.processDetectiveSheet(inputs);
+                
+                // Alice should not have Miss Scarlet (manual override)
+                expectState(result.grid, 'Miss Scarlet', 'Alice', DetectiveLogic.CARD_STATES.DOESNT_HAVE, 
+                    "Alice should not have Miss Scarlet (manual override)");
+                
+                // Bob should not have Miss Scarlet (passed on suggestion)
+                expectState(result.grid, 'Miss Scarlet', 'Bob', DetectiveLogic.CARD_STATES.DOESNT_HAVE, 
+                    "Bob should not have Miss Scarlet when he passes");
+
+                // In this case, Miss Scarlet should be part of the solution
+                if (result.solution.person !== 'Miss Scarlet') {
+                    throw new Error("Miss Scarlet should be identified as part of the solution");
+                }
+
+                return { success: true };
+            }
+        );
+
+        // Test Case 5: Set-based elimination with only one possibility
+        runner.addTest(
+            "Set-based Elimination - Single Possibility",
+            "When only one card in a maybe set is still possible, the player should be marked as having it",
+            function() {
+                const inputs = {
+                    players: ['Alice', 'Bob', 'Charlie'],
+                    suggestions: [
+                        {
+                            suggester: 'Alice',
+                            cards: ['Miss Scarlet', 'Knife', 'Kitchen'],
+                            revealer: 'Bob'
+                        }
+                    ],
+                    manualOverrides: {
+                        'Miss Scarlet': { 'Bob': DetectiveLogic.CARD_STATES.DOESNT_HAVE },
+                        'Knife': { 'Bob': DetectiveLogic.CARD_STATES.DOESNT_HAVE }
+                    }
+                };
+
+                const result = DetectiveLogic.processDetectiveSheet(inputs);
+                
+                // Bob should now definitely have Kitchen (only card left in the set)
+                expectState(result.grid, 'Kitchen', 'Bob', DetectiveLogic.CARD_STATES.HAS, 
+                    "Bob should have Kitchen when it's the only card left in the maybe set");
+
+                return { success: true };
+            }
+        );
+
+        // Test Case 6: Don't make assumptions when multiple options exist
+        runner.addTest(
+            "Don't Make Assumptions with Multiple Options",
+            "When multiple players could have a card, don't assume who has it",
+            function() {
+                const inputs = {
+                    players: ['Alice', 'Bob', 'Charlie'],
+                    suggestions: [
+                        {
+                            suggester: 'Alice',
+                            cards: ['Miss Scarlet', 'Knife', 'Kitchen'],
+                            revealer: 'Bob'
+                        }
+                    ]
+                };
+
+                const result = DetectiveLogic.processDetectiveSheet(inputs);
+                
+                // Miss Scarlet should remain unknown for Alice and Charlie
+                expectState(result.grid, 'Miss Scarlet', 'Alice', DetectiveLogic.CARD_STATES.UNKNOWN, 
+                    "Alice should remain unknown for Miss Scarlet");
+                expectState(result.grid, 'Miss Scarlet', 'Charlie', DetectiveLogic.CARD_STATES.UNKNOWN, 
+                    "Charlie should remain unknown for Miss Scarlet");
+
+                // Bob should have maybe for all cards in the suggestion
+                expectState(result.grid, 'Miss Scarlet', 'Bob', DetectiveLogic.CARD_STATES.MAYBE, 
+                    "Bob should have maybe for Miss Scarlet");
+
+                return { success: true };
+            }
+        );
+
+        // Test Case 7: Complex scenario with multiple suggestions
+        runner.addTest(
+            "Complex Multi-Suggestion Scenario",
+            "Test a more complex scenario with multiple suggestions to ensure conservative behavior",
+            function() {
+                const inputs = {
+                    players: ['Alice', 'Bob', 'Charlie', 'Diana'],
+                    suggestions: [
+                        {
+                            suggester: 'Alice',
+                            cards: ['Miss Scarlet', 'Knife', 'Kitchen'],
+                            revealer: 'Bob'
+                        },
+                        {
+                            suggester: 'Bob',
+                            cards: ['Colonel Mustard', 'Rope', 'Library'],
+                            revealer: 'Charlie',
+                            revealedCard: 'Colonel Mustard'
+                        },
+                        {
+                            suggester: 'Charlie',
+                            cards: ['Miss Scarlet', 'Candlestick', 'Ballroom'],
+                            revealer: 'Diana'
+                        }
+                    ]
+                };
+
+                const result = DetectiveLogic.processDetectiveSheet(inputs);
+                
+                // Charlie should definitely have Colonel Mustard
+                expectState(result.grid, 'Colonel Mustard', 'Charlie', DetectiveLogic.CARD_STATES.HAS, 
+                    "Charlie should have Colonel Mustard since he revealed it");
+                
+                // Charlie should not have the other cards from that suggestion
+                expectState(result.grid, 'Rope', 'Charlie', DetectiveLogic.CARD_STATES.DOESNT_HAVE, 
+                    "Charlie should not have Rope since he revealed Colonel Mustard");
+                
+                // Bob should have maybe states for his suggestion cards
+                expectState(result.grid, 'Miss Scarlet', 'Bob', DetectiveLogic.CARD_STATES.MAYBE, 
+                    "Bob should have maybe for Miss Scarlet");
+
+                // Diana should have maybe states for her suggestion cards
+                expectState(result.grid, 'Miss Scarlet', 'Diana', DetectiveLogic.CARD_STATES.MAYBE, 
+                    "Diana should have maybe for Miss Scarlet");
+
+                return { success: true };
+            }
+        );
+
+        // Test Case 8: Verify solution detection
+        runner.addTest(
+            "Solution Detection",
+            "The system should correctly identify solution cards when no player has them",
+            function() {
+                const inputs = {
+                    players: ['Alice', 'Bob'],
+                    suggestions: [
+                        {
+                            suggester: 'Alice',
+                            cards: ['Miss Scarlet', 'Knife', 'Kitchen'],
+                            revealer: 'pass'
+                        }
+                    ],
+                    manualOverrides: {
+                        // Manually mark Alice as not having these cards to make it clear they're in the solution
+                        'Miss Scarlet': { 'Alice': DetectiveLogic.CARD_STATES.DOESNT_HAVE },
+                        'Knife': { 'Alice': DetectiveLogic.CARD_STATES.DOESNT_HAVE },
+                        'Kitchen': { 'Alice': DetectiveLogic.CARD_STATES.DOESNT_HAVE }
+                    }
+                };
+
+                const result = DetectiveLogic.processDetectiveSheet(inputs);
+                
+                // Debug output
+                console.log('Solution result:', result.solution);
+                
+                // All three cards should be identified as part of the solution
+                if (result.solution.person !== 'Miss Scarlet' || 
+                    result.solution.weapon !== 'Knife' || 
+                    result.solution.room !== 'Kitchen') {
+                    throw new Error(`Solution should be Miss Scarlet, Knife, Kitchen but got ${JSON.stringify(result.solution)}`);
+                }
+
+                return { success: true };
+            }
+        );
+
+        // Test Case 9: Manual overrides should be respected
+        runner.addTest(
+            "Manual Overrides Respected",
+            "Manual overrides should take precedence over suggestion logic",
+            function() {
+                const inputs = {
+                    players: ['Alice', 'Bob', 'Charlie'],
+                    suggestions: [
+                        {
+                            suggester: 'Alice',
+                            cards: ['Miss Scarlet', 'Knife', 'Kitchen'],
+                            revealer: 'Bob'
+                        }
+                    ],
+                    manualOverrides: {
+                        'Miss Scarlet': { 'Alice': DetectiveLogic.CARD_STATES.HAS }
+                    }
+                };
+
+                const result = DetectiveLogic.processDetectiveSheet(inputs);
+                
+                // Alice should have Miss Scarlet due to manual override
+                expectState(result.grid, 'Miss Scarlet', 'Alice', DetectiveLogic.CARD_STATES.HAS, 
+                    "Alice should have Miss Scarlet due to manual override");
+                
+                // This should propagate - Bob should not have Miss Scarlet
+                expectState(result.grid, 'Miss Scarlet', 'Bob', DetectiveLogic.CARD_STATES.DOESNT_HAVE, 
+                    "Bob should not have Miss Scarlet since Alice has it");
+
+                return { success: true };
+            }
+        );
+
+        // Test Case 10: Passers should be marked correctly
+        runner.addTest(
+            "Passers Marked Correctly",
+            "Players who pass should be marked as not having the suggested cards",
+            function() {
+                const inputs = {
+                    players: ['Alice', 'Bob', 'Charlie', 'Diana'],
+                    suggestions: [
+                        {
+                            suggester: 'Alice',
+                            cards: ['Miss Scarlet', 'Knife', 'Kitchen'],
+                            revealer: 'Diana',
+                            passers: ['Bob', 'Charlie']
+                        }
+                    ]
+                };
+
+                const result = DetectiveLogic.processDetectiveSheet(inputs);
+                
+                // Passers should not have any of the suggested cards
+                expectState(result.grid, 'Miss Scarlet', 'Bob', DetectiveLogic.CARD_STATES.DOESNT_HAVE, 
+                    "Bob should not have Miss Scarlet since he passed");
+                expectState(result.grid, 'Knife', 'Charlie', DetectiveLogic.CARD_STATES.DOESNT_HAVE, 
+                    "Charlie should not have Knife since he passed");
+                
+                // Diana should have maybe for the suggested cards
+                expectState(result.grid, 'Miss Scarlet', 'Diana', DetectiveLogic.CARD_STATES.MAYBE, 
+                    "Diana should have maybe for Miss Scarlet");
+
+                return { success: true };
+            }
+        );
+
+        // Run all tests when the page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            runner.runTests();
+        });
+    </script>
+</body>
+</html>
