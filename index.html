@@ -492,13 +492,10 @@
         </div>
     </div>
 
+    <script src="detective-logic.js"></script>
     <script>
-        // Game data
-        const gameData = {
-            people: ['Miss Scarlet', 'Colonel Mustard', 'Mrs. White', 'Mr. Green', 'Mrs. Peacock', 'Professor Plum'],
-            weapons: ['Candlestick', 'Knife', 'Lead Pipe', 'Revolver', 'Rope', 'Wrench'],
-            rooms: ['Kitchen', 'Ballroom', 'Conservatory', 'Dining Room', 'Billiard Room', 'Library', 'Lounge', 'Hall', 'Study']
-        };
+        // Game data - use the data from the detective logic module
+        const gameData = DetectiveLogic.GAME_DATA;
 
         // State management
         let players = [];
@@ -975,11 +972,7 @@
             }
             
             // Run elimination logic
-            runEliminationLogic();
-            
-            updateDetectiveSheet();
-            checkForSolution();
-            updateURL();
+            refreshSheetState();
         }
 
         // Suggestion handling
@@ -1049,73 +1042,26 @@
                 timestamp: new Date()
             });
             
-            // Process the suggestion logic
-            if (revealer === 'pass') {
-                // Everyone passed - all other players don't have any of these cards
-                suggestedCards.forEach(card => {
-                    players.forEach(player => {
-                        if (player !== suggester) {
-                            setGridState(card, player, -1); // doesn't have
-                        }
-                    });
-                });
-            } else {
-                // Someone revealed
-                const revealerIndex = players.indexOf(revealer);
-                const suggesterIndex = players.indexOf(suggester);
-                
-                // All players between suggester and revealer don't have any of these cards
-                let currentIndex = (suggesterIndex + 1) % players.length;
-                while (currentIndex !== revealerIndex) {
-                    const player = players[currentIndex];
-                    suggestedCards.forEach(card => {
-                        setGridState(card, player, -1); // doesn't have
-                    });
-                    currentIndex = (currentIndex + 1) % players.length;
-                }
-                
-                // The revealer has at least one of these cards
-                if (revealedCard) {
-                    // We know exactly which card they revealed
-                    setGridState(revealedCard, revealer, 1); // has
-                    // They don't have the other cards
-                    suggestedCards.forEach(card => {
-                        if (card !== revealedCard) {
-                            setGridState(card, revealer, -1); // doesn't have
-                        }
-                    });
-                } else {
-                    // We don't know which card, but they have at least one
-                    // Create a maybe set instead of marking individual cards
-                    const eligibleCards = suggestedCards.filter(card => {
-                        return !(grid[card] && grid[card][revealer] === -1) && 
-                               !(grid[card] && grid[card][revealer] === 1);
-                    });
-                    
-                    if (eligibleCards.length > 0) {
-                        // Create a new maybe set
-                        const setId = Date.now() + Math.random(); // Simple unique ID
-                        const newSet = {
-                            id: setId,
-                            cards: eligibleCards
-                        };
-                        
-                        // Add to player's maybe sets
-                        if (!maybeSets[revealer]) {
-                            maybeSets[revealer] = [];
-                        }
-                        maybeSets[revealer].push(newSet);
-                        
-                        // Mark the cards as maybe (state 2) for display purposes
-                        eligibleCards.forEach(card => {
-                            setGridState(card, revealer, 2);
-                        });
-                    }
-                }
-            }
+            // Use the new detective logic to process everything
+            refreshSheetState();
+        }
+
+        // Process all data using the new detective logic
+        function refreshSheetState() {
+            // Prepare inputs for the detective logic
+            const inputs = {
+                players: players,
+                suggestions: suggestions,
+                manualOverrides: convertGridToManualOverrides()
+            };
             
-            // Run elimination logic
-            runEliminationLogic();
+            // Process the detective sheet
+            const result = DetectiveLogic.processDetectiveSheet(inputs);
+            
+            // Update the grid and maybe sets
+            grid = result.grid;
+            maybeSets = result.maybeSets;
+            solution = result.solution;
             
             // Update displays
             updateDetectiveSheet();
@@ -1123,134 +1069,29 @@
             checkForSolution();
             updateURL();
         }
-
-        function setGridState(card, player, state) {
-            if (!grid[card]) {
-                grid[card] = {};
-            }
-            
-            const oldState = grid[card][player];
-            grid[card][player] = state;
-            
-            // Update maybe sets when state changes
-            if (oldState === 2 && state !== 2) {
-                // Card is no longer maybe, remove from sets
-                removeMaybeCardFromSets(card, player);
-            } else if (oldState !== 1 && state === 1) {
-                // Card is now definitely has, clean up sets
-                cleanupSetsForPlayer(player, card);
-            }
-        }
         
-        function removeMaybeCardFromSets(card, player) {
-            if (!maybeSets[player]) return;
+        // Convert current grid state to manual overrides format
+        function convertGridToManualOverrides() {
+            const overrides = {};
             
-            maybeSets[player].forEach((set, setIndex) => {
-                const cardIndex = set.cards.indexOf(card);
-                if (cardIndex !== -1) {
-                    set.cards.splice(cardIndex, 1);
-                }
-            });
+            // Only include states that were manually set by the user via toggleCell
+            // We'll track this separately in the future, but for now we'll be conservative
+            // and only include states that are clearly user-set (like from the current user's cards)
             
-            // Remove empty sets
-            maybeSets[player] = maybeSets[player].filter(set => set.cards.length > 0);
-        }
-        
-        function cleanupSetsForPlayer(player, definiteCard) {
-            if (!maybeSets[player]) return;
-            
-            // Find sets containing this card and remove other cards from those sets
-            const setsToUpdate = maybeSets[player].filter(set => set.cards.includes(definiteCard));
-            
-            setsToUpdate.forEach(set => {
-                set.cards.forEach(card => {
-                    if (card !== definiteCard && grid[card] && grid[card][player] === 2) {
-                        setGridState(card, player, -1); // Mark as doesn't have
-                    }
-                });
-            });
-            
-            // Remove sets that contained this card
-            maybeSets[player] = maybeSets[player].filter(set => !set.cards.includes(definiteCard));
-        }
-
-        function runEliminationLogic() {
-            let changed = true;
-            while (changed) {
-                changed = false;
-                
-                // For each card, if only one player can have it, mark them as having it
-                Object.keys(grid).forEach(card => {
-                    const possiblePlayers = players.filter(player => 
-                        grid[card][player] === 0 || grid[card][player] === 1 || grid[card][player] === 2
-                    );
-                    
-                    const definitelyHas = players.filter(player => grid[card][player] === 1);
-                    const maybeHas = players.filter(player => grid[card][player] === 2);
-                    const unknown = players.filter(player => grid[card][player] === 0);
-                    
-                    if (definitelyHas.length === 0 && maybeHas.length === 1 && unknown.length === 0) {
-                        // Only one player might have it, so they must have it
-                        setGridState(card, maybeHas[0], 1);
-                        changed = true;
-                    } else if (definitelyHas.length === 0 && maybeHas.length === 0 && unknown.length === 1) {
-                        // Only one player could have it, so they must have it
-                        setGridState(card, unknown[0], 1);
-                        changed = true;
-                    }
-                });
-                
-                // If a player definitely has a card, mark all other players as not having it
-                Object.keys(grid).forEach(card => {
-                    const playersWithCard = players.filter(player => grid[card][player] === 1);
-                    
-                    if (playersWithCard.length === 1) {
-                        // One player has the card, so all others don't have it
-                        players.forEach(player => {
-                            if (player !== playersWithCard[0] && grid[card][player] !== -1) {
-                                setGridState(card, player, -1);
-                                changed = true;
-                            }
-                        });
-                    }
-                });
-                
-                // If a player has a card, they don't have the others in suggestions where they revealed
-                suggestions.forEach(suggestion => {
-                    if (suggestion.revealedCard) return; // Skip if we know the exact card
-                    
-                    const { cards, revealer } = suggestion;
-                    const hasCards = cards.filter(card => grid[card] && grid[card][revealer] === 1);
-                    
-                    if (hasCards.length === 1) {
-                        // They have exactly one of the suggested cards, so they don't have the others
-                        cards.forEach(card => {
-                            if (card !== hasCards[0] && grid[card] && grid[card][revealer] === 2) {
-                                setGridState(card, revealer, -1);
-                                changed = true;
-                            }
-                        });
-                    }
-                });
-                
-                // Set-based elimination logic
-                players.forEach(player => {
-                    if (!maybeSets[player]) return;
-                    
-                    maybeSets[player].forEach(set => {
-                        // Count how many cards in this set are still possible
-                        const possibleCards = set.cards.filter(card => 
-                            grid[card] && grid[card][player] === 2
-                        );
-                        
-                        if (possibleCards.length === 1) {
-                            // Only one card left in the set, so they must have it
-                            setGridState(possibleCards[0], player, 1);
-                            changed = true;
+            // Include cards that belong to the current user
+            if (currentUser) {
+                const allCards = [...gameData.people, ...gameData.weapons, ...gameData.rooms];
+                allCards.forEach(card => {
+                    if (grid[card] && grid[card][currentUser] === 1) {
+                        if (!overrides[card]) {
+                            overrides[card] = {};
                         }
-                    });
+                        overrides[card][currentUser] = 1;
+                    }
                 });
             }
+            
+            return overrides;
         }
 
         function updateRevealedCardOptions() {
@@ -1342,7 +1183,7 @@
             });
             
             // Run elimination logic
-            runEliminationLogic();
+            refreshSheetState();
         }
 
         function resetGridForPlayer(playerName) {
