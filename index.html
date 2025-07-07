@@ -683,7 +683,7 @@
                         const cellClass = getCellClass(state);
                         const cellSymbol = getCellSymbol(state);
                         
-                        rowHtml += `<td><div class="cell ${cellClass}" onclick="toggleCell('${card}', '${player}')">${cellSymbol}</div></td>`;
+                        rowHtml += `<td><div class="cell ${cellClass}">${cellSymbol}</div></td>`;
                     });
                     
                     row.innerHTML = rowHtml;
