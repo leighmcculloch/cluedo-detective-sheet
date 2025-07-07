@@ -1336,6 +1336,11 @@
                 resetGridForPlayer(player);
             });
             
+            // Reset maybe sets for all players
+            players.forEach(player => {
+                maybeSets[player] = [];
+            });
+            
             // Replay all remaining suggestions in chronological order
             suggestions.forEach(suggestion => {
                 replaySuggestion(suggestion);
@@ -1396,16 +1401,31 @@
                     });
                 } else {
                     // We don't know which card, but they have at least one
-                    suggestedCards.forEach(card => {
-                        if (grid[card] && grid[card][suggestion.revealer] === -1) {
-                            // Already marked as doesn't have, leave it
-                        } else if (grid[card] && grid[card][suggestion.revealer] === 1) {
-                            // Already marked as has, leave it
-                        } else {
-                            // Mark as maybe
-                            setGridState(card, suggestion.revealer, 2);
-                        }
+                    // Create a maybe set instead of marking individual cards
+                    const eligibleCards = suggestedCards.filter(card => {
+                        return !(grid[card] && grid[card][suggestion.revealer] === -1) && 
+                               !(grid[card] && grid[card][suggestion.revealer] === 1);
                     });
+                    
+                    if (eligibleCards.length > 0) {
+                        // Create a new maybe set
+                        const setId = Date.now() + Math.random(); // Simple unique ID
+                        const newSet = {
+                            id: setId,
+                            cards: eligibleCards
+                        };
+                        
+                        // Add to player's maybe sets
+                        if (!maybeSets[suggestion.revealer]) {
+                            maybeSets[suggestion.revealer] = [];
+                        }
+                        maybeSets[suggestion.revealer].push(newSet);
+                        
+                        // Mark the cards as maybe (state 2) for display purposes
+                        eligibleCards.forEach(card => {
+                            setGridState(card, suggestion.revealer, 2);
+                        });
+                    }
                 }
             }
         }
