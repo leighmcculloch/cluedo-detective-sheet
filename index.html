@@ -196,6 +196,14 @@
             color: white;
         }
 
+        .card-row-known {
+            opacity: 0.4;
+        }
+
+        .card-row-known .card-name {
+            color: #888;
+        }
+
         .suggestion-form {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -684,6 +692,18 @@
                 // Cards in category
                 gameData[category].forEach(card => {
                     const row = document.createElement('tr');
+                    
+                    // Check if this card is known to be held by any player
+                    const isKnownCard = players.some(player => {
+                        const state = grid[card] && grid[card][player] !== undefined ? grid[card][player] : 0;
+                        return state === 1; // State 1 means "has"
+                    });
+                    
+                    // Apply dimming class if card is known
+                    if (isKnownCard) {
+                        row.classList.add('card-row-known');
+                    }
+                    
                     let rowHtml = `<td class="card-name">${card}</td>`;
                     
                     players.forEach(player => {
