@@ -1021,7 +1021,7 @@
             
             // Process the suggestion logic
             if (revealer === 'pass') {
-                // Everyone passed - all players don't have any of these cards
+                // Everyone passed - all other players don't have any of these cards
                 suggestedCards.forEach(card => {
                     players.forEach(player => {
                         if (player !== suggester) {
