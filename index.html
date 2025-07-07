@@ -750,10 +750,24 @@
             
             processSuggestion(suggester, person, weapon, room, revealer, revealedCard);
             
-            // Reset form
+            // Get next player for auto-update
+            const nextPlayer = getNextPlayer(suggester);
+            
+            // Reset form but keep suggester as next player
             this.reset();
+            if (nextPlayer) {
+                document.getElementById('suggester').value = nextPlayer;
+            }
             updateRevealedCardOptions();
         });
+
+        function getNextPlayer(currentPlayer) {
+            const currentIndex = players.indexOf(currentPlayer);
+            if (currentIndex === -1) {
+                return players.length > 0 ? players[0] : '';
+            }
+            return players[(currentIndex + 1) % players.length];
+        }
 
         function processSuggestion(suggester, person, weapon, room, revealer, revealedCard) {
             const suggestedCards = [person, weapon, room];
