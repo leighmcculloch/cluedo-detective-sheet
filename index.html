@@ -802,9 +802,7 @@
                 // Everyone passed - all players don't have any of these cards
                 suggestedCards.forEach(card => {
                     players.forEach(player => {
-                        if (player !== suggester) {
-                            setGridState(card, player, -1); // doesn't have
-                        }
+                        setGridState(card, player, -1); // doesn't have
                     });
                 });
             } else {
