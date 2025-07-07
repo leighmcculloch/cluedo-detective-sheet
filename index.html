@@ -211,6 +211,12 @@
             text-align: center;
         }
 
+        .sheet-table th:not(:first-child),
+        .sheet-table td:not(:first-child) {
+            width: 60px;
+            min-width: 60px;
+        }
+
         .sheet-table th {
             background-color: #8B4513;
             color: white;
@@ -230,7 +236,7 @@
         }
 
         .cell {
-            width: 30px;
+            min-width: 30px;
             height: 30px;
             cursor: pointer;
             border-radius: 3px;
@@ -238,7 +244,8 @@
             align-items: center;
             justify-content: center;
             font-weight: bold;
-            font-size: 18px;
+            font-size: 16px;
+            width: 100%;
         }
 
         .cell.unknown {
