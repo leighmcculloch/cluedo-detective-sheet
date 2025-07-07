@@ -758,12 +758,30 @@
         function processSuggestion(suggester, person, weapon, room, revealer, revealedCard) {
             const suggestedCards = [person, weapon, room];
             
+            // Calculate passers
+            let passers = [];
+            if (revealer === 'pass') {
+                // Everyone passed except the suggester
+                passers = players.filter(player => player !== suggester);
+            } else {
+                // Players between suggester and revealer passed
+                const revealerIndex = players.indexOf(revealer);
+                const suggesterIndex = players.indexOf(suggester);
+                
+                let currentIndex = (suggesterIndex + 1) % players.length;
+                while (currentIndex !== revealerIndex) {
+                    passers.push(players[currentIndex]);
+                    currentIndex = (currentIndex + 1) % players.length;
+                }
+            }
+            
             // Add to history
             suggestions.push({
                 suggester,
                 cards: suggestedCards,
                 revealer,
                 revealedCard: revealedCard || null,
+                passers,
                 timestamp: new Date()
             });
             
@@ -913,6 +931,16 @@
                 const historyItem = document.createElement('div');
                 historyItem.className = 'history-item';
                 
+                // Build passers text
+                let passersText = '';
+                if (suggestion.passers && suggestion.passers.length > 0) {
+                    if (suggestion.passers.length === 1) {
+                        passersText = `${suggestion.passers[0]} passed. `;
+                    } else {
+                        passersText = `${suggestion.passers.join(', ')} passed. `;
+                    }
+                }
+                
                 const revealText = suggestion.revealer === 'pass' ? 
                     'Everyone passed' : 
                     suggestion.revealedCard ? 
@@ -922,7 +950,7 @@
                 historyItem.innerHTML = `
                     <strong>${suggestion.suggester}</strong> suggested: 
                     <strong>${suggestion.cards.join(', ')}</strong><br>
-                    ${revealText}
+                    ${passersText}${revealText}
                 `;
                 
                 historyDiv.appendChild(historyItem);
