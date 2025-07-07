@@ -725,6 +725,9 @@
                 case 2: grid[card][player] = 0; break; // maybe -> unknown
             }
             
+            // Run elimination logic
+            runEliminationLogic();
+            
             updateDetectiveSheet();
             checkForSolution();
             updateURL();
@@ -887,6 +890,21 @@
                         // Only one player could have it, so they must have it
                         setGridState(card, unknown[0], 1);
                         changed = true;
+                    }
+                });
+                
+                // If a player definitely has a card, mark all other players as not having it
+                Object.keys(grid).forEach(card => {
+                    const playersWithCard = players.filter(player => grid[card][player] === 1);
+                    
+                    if (playersWithCard.length === 1) {
+                        // One player has the card, so all others don't have it
+                        players.forEach(player => {
+                            if (player !== playersWithCard[0] && grid[card][player] !== -1) {
+                                setGridState(card, player, -1);
+                                changed = true;
+                            }
+                        });
                     }
                 });
                 
