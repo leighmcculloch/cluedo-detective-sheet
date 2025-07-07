@@ -56,6 +56,70 @@
             margin-bottom: 15px;
         }
 
+        .player-setup-extended {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .player-setup-row {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .me-checkbox {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .cards-selection {
+            margin-top: 10px;
+            padding: 15px;
+            background-color: #f9f9f9;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            display: none;
+        }
+
+        .cards-selection.visible {
+            display: block;
+        }
+
+        .cards-selection h4 {
+            margin-bottom: 10px;
+            color: #8B4513;
+        }
+
+        .cards-category {
+            margin-bottom: 15px;
+        }
+
+        .cards-category h5 {
+            margin-bottom: 8px;
+            color: #A0522D;
+            font-size: 14px;
+        }
+
+        .cards-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 5px;
+        }
+
+        .card-checkbox {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 12px;
+        }
+
+        .card-checkbox input[type="checkbox"] {
+            margin: 0;
+        }
+
         .player-setup input {
             padding: 8px;
             border: 1px solid #ddd;
@@ -287,9 +351,29 @@
         <!-- Player Setup Section -->
         <div class="section">
             <h2>Players Setup</h2>
-            <div class="player-setup">
-                <input type="text" id="playerName" placeholder="Enter player name" maxlength="20">
-                <button onclick="addPlayer()">Add Player</button>
+            <div class="player-setup-extended">
+                <div class="player-setup-row">
+                    <input type="text" id="playerName" placeholder="Enter player name" maxlength="20">
+                    <label class="me-checkbox">
+                        <input type="checkbox" id="isMe"> This is me
+                    </label>
+                    <button onclick="addPlayer()">Add Player</button>
+                </div>
+                <div class="cards-selection" id="cardsSelection">
+                    <h4>Select your cards:</h4>
+                    <div class="cards-category">
+                        <h5>People</h5>
+                        <div class="cards-grid" id="peopleCards"></div>
+                    </div>
+                    <div class="cards-category">
+                        <h5>Weapons</h5>
+                        <div class="cards-grid" id="weaponCards"></div>
+                    </div>
+                    <div class="cards-category">
+                        <h5>Rooms</h5>
+                        <div class="cards-grid" id="roomCards"></div>
+                    </div>
+                </div>
             </div>
             <div class="players-list" id="playersList"></div>
         </div>
@@ -388,13 +472,15 @@
         let grid = {}; // grid[card][player] = state (0=unknown, 1=has, -1=doesn't have, 2=maybe)
         let suggestions = [];
         let solution = null;
+        let currentUser = null; // Stores the name of the current user ("me")
 
         // URL State Management
         function encodeGameState() {
             const state = {
                 players: players,
                 grid: grid,
-                suggestions: suggestions
+                suggestions: suggestions,
+                currentUser: currentUser
             };
             
             try {
@@ -449,6 +535,7 @@
                     players = state.players || [];
                     grid = state.grid || {};
                     suggestions = state.suggestions || [];
+                    currentUser = state.currentUser || null;
                     
                     // Initialize grid for any missing players or cards
                     players.forEach(player => {
@@ -467,6 +554,7 @@
         // Initialize the application
         function init() {
             populateSelectOptions();
+            initializeCardSelection();
             
             // Try to load state from URL first
             const stateLoaded = loadFromURL();
@@ -484,7 +572,9 @@
         // Player management
         function addPlayer() {
             const nameInput = document.getElementById('playerName');
+            const isMeCheckbox = document.getElementById('isMe');
             const name = nameInput.value.trim();
+            const isMe = isMeCheckbox.checked;
             
             if (!name) {
                 alert('Please enter a player name');
@@ -501,13 +591,35 @@
                 return;
             }
             
+            // Check if another player is already marked as "me"
+            if (isMe && currentUser && currentUser !== name) {
+                if (!confirm(`"${currentUser}" is already marked as the current user. Replace with "${name}"?`)) {
+                    return;
+                }
+            }
+            
             players.push(name);
+            
+            // Set current user if this is "me"
+            if (isMe) {
+                currentUser = name;
+                
+                // Get selected cards and update grid
+                const selectedCards = getSelectedCards();
+                selectedCards.forEach(card => {
+                    setGridState(card, name, 1); // mark as has
+                });
+            }
+            
             nameInput.value = '';
+            isMeCheckbox.checked = false;
+            hideCardSelection();
             
             initializeGridForPlayer(name);
             updatePlayersDisplay();
             updateDetectiveSheet();
             updatePlayerSelects();
+            checkForSolution();
             updateURL();
         }
 
@@ -522,6 +634,11 @@
                         delete grid[card][name];
                     }
                 });
+                
+                // Clear current user if this was the current user
+                if (currentUser === name) {
+                    currentUser = null;
+                }
                 
                 updatePlayersDisplay();
                 updateDetectiveSheet();
@@ -577,8 +694,11 @@
             players.forEach((player, index) => {
                 const playerTag = document.createElement('div');
                 playerTag.className = 'player-tag';
+                const isCurrent = currentUser === player;
+                const meIndicator = isCurrent ? ' (me)' : '';
+                
                 playerTag.innerHTML = `
-                    <span>${player}</span>
+                    <span>${player}${meIndicator}</span>
                     <div class="player-controls">
                         <button class="reorder-btn" onclick="movePlayerUp(${index})" title="Move up" ${index === 0 ? 'disabled' : ''}>▲</button>
                         <button class="reorder-btn" onclick="movePlayerDown(${index})" title="Move down" ${index === players.length - 1 ? 'disabled' : ''}>▼</button>
@@ -587,6 +707,69 @@
                 `;
                 playersList.appendChild(playerTag);
             });
+        }
+
+        // Card selection functions
+        function initializeCardSelection() {
+            populateCardCheckboxes();
+            
+            // Add event listener for "This is me" checkbox
+            const isMeCheckbox = document.getElementById('isMe');
+            isMeCheckbox.addEventListener('change', function() {
+                if (this.checked) {
+                    showCardSelection();
+                } else {
+                    hideCardSelection();
+                }
+            });
+        }
+
+        function populateCardCheckboxes() {
+            const categories = [
+                { id: 'peopleCards', cards: gameData.people },
+                { id: 'weaponCards', cards: gameData.weapons },
+                { id: 'roomCards', cards: gameData.rooms }
+            ];
+            
+            categories.forEach(category => {
+                const container = document.getElementById(category.id);
+                container.innerHTML = '';
+                
+                category.cards.forEach(card => {
+                    const checkbox = document.createElement('label');
+                    checkbox.className = 'card-checkbox';
+                    checkbox.innerHTML = `
+                        <input type="checkbox" value="${card}" onchange="onCardSelectionChange()">
+                        <span>${card}</span>
+                    `;
+                    container.appendChild(checkbox);
+                });
+            });
+        }
+
+        function showCardSelection() {
+            const cardsSelection = document.getElementById('cardsSelection');
+            cardsSelection.classList.add('visible');
+        }
+
+        function hideCardSelection() {
+            const cardsSelection = document.getElementById('cardsSelection');
+            cardsSelection.classList.remove('visible');
+            
+            // Clear all card selections
+            const checkboxes = cardsSelection.querySelectorAll('input[type="checkbox"]');
+            checkboxes.forEach(cb => cb.checked = false);
+        }
+
+        function getSelectedCards() {
+            const cardsSelection = document.getElementById('cardsSelection');
+            const checkboxes = cardsSelection.querySelectorAll('input[type="checkbox"]:checked');
+            return Array.from(checkboxes).map(cb => cb.value);
+        }
+
+        function onCardSelectionChange() {
+            // This function can be used to provide real-time feedback if needed
+            // For now, we'll just process the selection when adding the player
         }
 
         function updatePlayerSelects() {
