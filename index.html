@@ -1,1 +1,991 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cluedo Detective Sheet</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
 
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #f5f5f5;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        h1 {
+            text-align: center;
+            color: #8B4513;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            background-color: #fafafa;
+        }
+
+        .section h2 {
+            color: #8B4513;
+            margin-bottom: 15px;
+            border-bottom: 2px solid #8B4513;
+            padding-bottom: 5px;
+        }
+
+        .player-setup {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .player-setup input {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            flex: 1;
+        }
+
+        .player-setup button {
+            padding: 8px 16px;
+            background-color: #8B4513;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .player-setup button:hover {
+            background-color: #A0522D;
+        }
+
+        .players-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .player-tag {
+            background-color: #8B4513;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 15px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .player-tag .player-controls {
+            display: flex;
+            align-items: center;
+            gap: 3px;
+        }
+
+        .player-tag .reorder-btn,
+        .player-tag .remove-btn {
+            background: none;
+            border: none;
+            color: white;
+            cursor: pointer;
+            font-size: 12px;
+            padding: 0;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .player-tag .remove-btn {
+            font-size: 14px;
+        }
+
+        .player-tag .reorder-btn:hover,
+        .player-tag .remove-btn:hover {
+            background-color: rgba(255,255,255,0.2);
+        }
+
+        .player-tag .reorder-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .detective-sheet {
+            overflow-x: auto;
+            margin-bottom: 20px;
+        }
+
+        .sheet-table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 600px;
+        }
+
+        .sheet-table th,
+        .sheet-table td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: center;
+        }
+
+        .sheet-table th {
+            background-color: #8B4513;
+            color: white;
+            font-weight: bold;
+        }
+
+        .sheet-table .category-header {
+            background-color: #A0522D;
+            font-weight: bold;
+        }
+
+        .sheet-table .card-name {
+            background-color: #f9f9f9;
+            font-weight: bold;
+            text-align: left;
+            padding-left: 15px;
+        }
+
+        .cell {
+            width: 30px;
+            height: 30px;
+            cursor: pointer;
+            border-radius: 3px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 18px;
+        }
+
+        .cell.unknown {
+            background-color: #f0f0f0;
+        }
+
+        .cell.has {
+            background-color: #4CAF50;
+            color: white;
+        }
+
+        .cell.doesnt-have {
+            background-color: #f44336;
+            color: white;
+        }
+
+        .cell.maybe {
+            background-color: #FF9800;
+            color: white;
+        }
+
+        .suggestion-form {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .form-group label {
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #8B4513;
+        }
+
+        .form-group select,
+        .form-group input {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        .submit-suggestion {
+            grid-column: 1 / -1;
+            padding: 12px;
+            background-color: #8B4513;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+
+        .submit-suggestion:hover {
+            background-color: #A0522D;
+        }
+
+        .submit-suggestion:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+
+        .solution-box {
+            background-color: #e8f5e8;
+            border: 3px solid #4CAF50;
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .solution-box h3 {
+            color: #2E7D32;
+            margin-bottom: 10px;
+        }
+
+        .solution-content {
+            font-size: 18px;
+            font-weight: bold;
+            color: #1B5E20;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .history {
+            max-height: 200px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 10px;
+            background-color: white;
+        }
+
+        .history-item {
+            margin-bottom: 10px;
+            padding: 8px;
+            background-color: #f9f9f9;
+            border-radius: 4px;
+            border-left: 4px solid #8B4513;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🕵️ Cluedo Detective Sheet 🔍</h1>
+        
+        <!-- Player Setup Section -->
+        <div class="section">
+            <h2>Players Setup</h2>
+            <div class="player-setup">
+                <input type="text" id="playerName" placeholder="Enter player name" maxlength="20">
+                <button onclick="addPlayer()">Add Player</button>
+            </div>
+            <div class="players-list" id="playersList"></div>
+        </div>
+
+        <!-- Detective Sheet -->
+        <div class="section">
+            <h2>Detective Sheet</h2>
+            <div class="detective-sheet">
+                <table class="sheet-table" id="detectiveSheet">
+                    <thead>
+                        <tr>
+                            <th>Cards</th>
+                            <th id="playersHeader">Players →</th>
+                        </tr>
+                    </thead>
+                    <tbody id="sheetBody">
+                    </tbody>
+                </table>
+            </div>
+            <div class="legend">
+                <strong>Legend:</strong>
+                <span style="background-color: #4CAF50; color: white; padding: 2px 6px; border-radius: 3px; margin: 0 5px;">✓ Has</span>
+                <span style="background-color: #f44336; color: white; padding: 2px 6px; border-radius: 3px; margin: 0 5px;">✗ Doesn't Have</span>
+                <span style="background-color: #FF9800; color: white; padding: 2px 6px; border-radius: 3px; margin: 0 5px;">? Maybe</span>
+            </div>
+        </div>
+
+        <!-- Suggestion Form -->
+        <div class="section">
+            <h2>Add Suggestion</h2>
+            <form class="suggestion-form" id="suggestionForm">
+                <div class="form-group">
+                    <label for="suggester">Suggester:</label>
+                    <select id="suggester" required>
+                        <option value="">Select player...</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="suggestedPerson">Person:</label>
+                    <select id="suggestedPerson" required>
+                        <option value="">Select person...</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="suggestedWeapon">Weapon:</label>
+                    <select id="suggestedWeapon" required>
+                        <option value="">Select weapon...</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="suggestedRoom">Room:</label>
+                    <select id="suggestedRoom" required>
+                        <option value="">Select room...</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="revealer">Who revealed/passed:</label>
+                    <select id="revealer" required>
+                        <option value="">Select player...</option>
+                        <option value="pass">Everyone passed</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="revealedCard">Card revealed (if known):</label>
+                    <select id="revealedCard">
+                        <option value="">Unknown card</option>
+                    </select>
+                </div>
+                <button type="submit" class="submit-suggestion">Add Suggestion</button>
+            </form>
+        </div>
+
+        <!-- Solution Box -->
+        <div class="section solution-box hidden" id="solutionBox">
+            <h3>🎉 Solution Found! 🎉</h3>
+            <div class="solution-content" id="solutionContent"></div>
+        </div>
+
+        <!-- History -->
+        <div class="section">
+            <h2>Suggestion History</h2>
+            <div class="history" id="history"></div>
+        </div>
+    </div>
+
+    <script>
+        // Game data
+        const gameData = {
+            people: ['Miss Scarlet', 'Colonel Mustard', 'Mrs. White', 'Mr. Green', 'Mrs. Peacock', 'Professor Plum'],
+            weapons: ['Candlestick', 'Knife', 'Lead Pipe', 'Revolver', 'Rope', 'Wrench'],
+            rooms: ['Kitchen', 'Ballroom', 'Conservatory', 'Dining Room', 'Billiard Room', 'Library', 'Lounge', 'Hall', 'Study']
+        };
+
+        // State management
+        let players = [];
+        let grid = {}; // grid[card][player] = state (0=unknown, 1=has, -1=doesn't have, 2=maybe)
+        let suggestions = [];
+        let solution = null;
+
+        // URL State Management
+        function encodeGameState() {
+            const state = {
+                players: players,
+                grid: grid,
+                suggestions: suggestions
+            };
+            
+            try {
+                const jsonString = JSON.stringify(state);
+                // Use URL-safe base64 encoding
+                const encoded = btoa(jsonString)
+                    .replace(/\+/g, '-')
+                    .replace(/\//g, '_')
+                    .replace(/=/g, '');
+                return encoded;
+            } catch (e) {
+                console.error('Error encoding game state:', e);
+                return '';
+            }
+        }
+
+        function decodeGameState(encodedState) {
+            try {
+                // Convert back from URL-safe base64
+                let base64 = encodedState
+                    .replace(/-/g, '+')
+                    .replace(/_/g, '/');
+                
+                // Add padding if needed
+                while (base64.length % 4) {
+                    base64 += '=';
+                }
+                
+                const jsonString = atob(base64);
+                const state = JSON.parse(jsonString);
+                
+                return state;
+            } catch (e) {
+                console.error('Error decoding game state:', e);
+                return null;
+            }
+        }
+
+        function updateURL() {
+            const encoded = encodeGameState();
+            if (encoded) {
+                const newUrl = window.location.pathname + window.location.search + '#' + encoded;
+                window.history.replaceState({}, '', newUrl);
+            }
+        }
+
+        function loadFromURL() {
+            const hash = window.location.hash.substring(1); // Remove the '#'
+            if (hash) {
+                const state = decodeGameState(hash);
+                if (state) {
+                    players = state.players || [];
+                    grid = state.grid || {};
+                    suggestions = state.suggestions || [];
+                    
+                    // Initialize grid for any missing players or cards
+                    players.forEach(player => {
+                        initializeGridForPlayer(player);
+                    });
+                    
+                    // Restore suggestions history
+                    updateHistory();
+                    
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        // Initialize the application
+        function init() {
+            populateSelectOptions();
+            
+            // Try to load state from URL first
+            const stateLoaded = loadFromURL();
+            
+            updatePlayersDisplay();
+            updateDetectiveSheet();
+            updatePlayerSelects();
+            
+            // If no state was loaded from URL, update URL with current (empty) state
+            if (!stateLoaded) {
+                updateURL();
+            }
+        }
+
+        // Player management
+        function addPlayer() {
+            const nameInput = document.getElementById('playerName');
+            const name = nameInput.value.trim();
+            
+            if (!name) {
+                alert('Please enter a player name');
+                return;
+            }
+            
+            if (players.includes(name)) {
+                alert('Player already exists');
+                return;
+            }
+            
+            if (players.length >= 6) {
+                alert('Maximum 6 players allowed');
+                return;
+            }
+            
+            players.push(name);
+            nameInput.value = '';
+            
+            initializeGridForPlayer(name);
+            updatePlayersDisplay();
+            updateDetectiveSheet();
+            updatePlayerSelects();
+            updateURL();
+        }
+
+        function removePlayer(name) {
+            const index = players.indexOf(name);
+            if (index > -1) {
+                players.splice(index, 1);
+                
+                // Remove from grid
+                Object.keys(grid).forEach(card => {
+                    if (grid[card][name] !== undefined) {
+                        delete grid[card][name];
+                    }
+                });
+                
+                updatePlayersDisplay();
+                updateDetectiveSheet();
+                updatePlayerSelects();
+                updateURL();
+            }
+        }
+
+        function movePlayerUp(index) {
+            if (index > 0) {
+                // Swap with the previous player
+                const temp = players[index];
+                players[index] = players[index - 1];
+                players[index - 1] = temp;
+                
+                updatePlayersDisplay();
+                updateDetectiveSheet();
+                updatePlayerSelects();
+                updateURL();
+            }
+        }
+
+        function movePlayerDown(index) {
+            if (index < players.length - 1) {
+                // Swap with the next player
+                const temp = players[index];
+                players[index] = players[index + 1];
+                players[index + 1] = temp;
+                
+                updatePlayersDisplay();
+                updateDetectiveSheet();
+                updatePlayerSelects();
+                updateURL();
+            }
+        }
+
+        function initializeGridForPlayer(playerName) {
+            const allCards = [...gameData.people, ...gameData.weapons, ...gameData.rooms];
+            allCards.forEach(card => {
+                if (!grid[card]) {
+                    grid[card] = {};
+                }
+                if (grid[card][playerName] === undefined) {
+                    grid[card][playerName] = 0; // unknown
+                }
+            });
+        }
+
+        function updatePlayersDisplay() {
+            const playersList = document.getElementById('playersList');
+            playersList.innerHTML = '';
+            
+            players.forEach((player, index) => {
+                const playerTag = document.createElement('div');
+                playerTag.className = 'player-tag';
+                playerTag.innerHTML = `
+                    <span>${player}</span>
+                    <div class="player-controls">
+                        <button class="reorder-btn" onclick="movePlayerUp(${index})" title="Move up" ${index === 0 ? 'disabled' : ''}>▲</button>
+                        <button class="reorder-btn" onclick="movePlayerDown(${index})" title="Move down" ${index === players.length - 1 ? 'disabled' : ''}>▼</button>
+                        <button class="remove-btn" onclick="removePlayer('${player}')" title="Remove player">×</button>
+                    </div>
+                `;
+                playersList.appendChild(playerTag);
+            });
+        }
+
+        function updatePlayerSelects() {
+            const suggesterSelect = document.getElementById('suggester');
+            const revealerSelect = document.getElementById('revealer');
+            
+            [suggesterSelect, revealerSelect].forEach(select => {
+                // Save current value
+                const currentValue = select.value;
+                
+                // Clear options except first one
+                while (select.children.length > 1) {
+                    select.removeChild(select.lastChild);
+                }
+                
+                // Add player options
+                players.forEach(player => {
+                    const option = document.createElement('option');
+                    option.value = player;
+                    option.textContent = player;
+                    select.appendChild(option);
+                });
+                
+                // Add "Everyone passed" option to revealer
+                if (select === revealerSelect) {
+                    const passOption = document.createElement('option');
+                    passOption.value = 'pass';
+                    passOption.textContent = 'Everyone passed';
+                    select.appendChild(passOption);
+                }
+                
+                // Restore value if still valid
+                if (currentValue && Array.from(select.options).some(opt => opt.value === currentValue)) {
+                    select.value = currentValue;
+                }
+            });
+        }
+
+        function populateSelectOptions() {
+            const personSelect = document.getElementById('suggestedPerson');
+            const weaponSelect = document.getElementById('suggestedWeapon');
+            const roomSelect = document.getElementById('suggestedRoom');
+            
+            gameData.people.forEach(person => {
+                const option = document.createElement('option');
+                option.value = person;
+                option.textContent = person;
+                personSelect.appendChild(option);
+            });
+            
+            gameData.weapons.forEach(weapon => {
+                const option = document.createElement('option');
+                option.value = weapon;
+                option.textContent = weapon;
+                weaponSelect.appendChild(option);
+            });
+            
+            gameData.rooms.forEach(room => {
+                const option = document.createElement('option');
+                option.value = room;
+                option.textContent = room;
+                roomSelect.appendChild(option);
+            });
+        }
+
+        function updateDetectiveSheet() {
+            const sheetBody = document.getElementById('sheetBody');
+            const headerRow = document.querySelector('#detectiveSheet thead tr');
+            
+            // Update header
+            let headerHtml = '<th>Cards</th>';
+            players.forEach(player => {
+                headerHtml += `<th>${player}</th>`;
+            });
+            headerRow.innerHTML = headerHtml;
+            
+            // Clear body
+            sheetBody.innerHTML = '';
+            
+            // Add rows for each category
+            ['people', 'weapons', 'rooms'].forEach(category => {
+                // Category header
+                const categoryRow = document.createElement('tr');
+                categoryRow.innerHTML = `<td class="category-header" colspan="${players.length + 1}">${category.charAt(0).toUpperCase() + category.slice(1)}</td>`;
+                sheetBody.appendChild(categoryRow);
+                
+                // Cards in category
+                gameData[category].forEach(card => {
+                    const row = document.createElement('tr');
+                    let rowHtml = `<td class="card-name">${card}</td>`;
+                    
+                    players.forEach(player => {
+                        const state = grid[card] && grid[card][player] !== undefined ? grid[card][player] : 0;
+                        const cellClass = getCellClass(state);
+                        const cellSymbol = getCellSymbol(state);
+                        
+                        rowHtml += `<td><div class="cell ${cellClass}" onclick="toggleCell('${card}', '${player}')">${cellSymbol}</div></td>`;
+                    });
+                    
+                    row.innerHTML = rowHtml;
+                    sheetBody.appendChild(row);
+                });
+            });
+        }
+
+        function getCellClass(state) {
+            switch(state) {
+                case 1: return 'has';
+                case -1: return 'doesnt-have';
+                case 2: return 'maybe';
+                default: return 'unknown';
+            }
+        }
+
+        function getCellSymbol(state) {
+            switch(state) {
+                case 1: return '✓';
+                case -1: return '✗';
+                case 2: return '?';
+                default: return '';
+            }
+        }
+
+        function toggleCell(card, player) {
+            if (!grid[card]) {
+                grid[card] = {};
+            }
+            
+            const currentState = grid[card][player] || 0;
+            
+            // Cycle through states: unknown -> doesn't have -> has -> maybe -> unknown
+            switch(currentState) {
+                case 0: grid[card][player] = -1; break; // unknown -> doesn't have
+                case -1: grid[card][player] = 1; break; // doesn't have -> has
+                case 1: grid[card][player] = 2; break; // has -> maybe
+                case 2: grid[card][player] = 0; break; // maybe -> unknown
+            }
+            
+            updateDetectiveSheet();
+            checkForSolution();
+            updateURL();
+        }
+
+        // Suggestion handling
+        document.getElementById('suggestionForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const suggester = document.getElementById('suggester').value;
+            const person = document.getElementById('suggestedPerson').value;
+            const weapon = document.getElementById('suggestedWeapon').value;
+            const room = document.getElementById('suggestedRoom').value;
+            const revealer = document.getElementById('revealer').value;
+            const revealedCard = document.getElementById('revealedCard').value;
+            
+            if (!suggester || !person || !weapon || !room || !revealer) {
+                alert('Please fill in all required fields');
+                return;
+            }
+            
+            processSuggestion(suggester, person, weapon, room, revealer, revealedCard);
+            
+            // Reset form
+            this.reset();
+            updateRevealedCardOptions();
+        });
+
+        function processSuggestion(suggester, person, weapon, room, revealer, revealedCard) {
+            const suggestedCards = [person, weapon, room];
+            
+            // Add to history
+            suggestions.push({
+                suggester,
+                cards: suggestedCards,
+                revealer,
+                revealedCard: revealedCard || null,
+                timestamp: new Date()
+            });
+            
+            // Process the suggestion logic
+            if (revealer === 'pass') {
+                // Everyone passed - all players don't have any of these cards
+                suggestedCards.forEach(card => {
+                    players.forEach(player => {
+                        if (player !== suggester) {
+                            setGridState(card, player, -1); // doesn't have
+                        }
+                    });
+                });
+            } else {
+                // Someone revealed
+                const revealerIndex = players.indexOf(revealer);
+                const suggesterIndex = players.indexOf(suggester);
+                
+                // All players between suggester and revealer don't have any of these cards
+                let currentIndex = (suggesterIndex + 1) % players.length;
+                while (currentIndex !== revealerIndex) {
+                    const player = players[currentIndex];
+                    suggestedCards.forEach(card => {
+                        setGridState(card, player, -1); // doesn't have
+                    });
+                    currentIndex = (currentIndex + 1) % players.length;
+                }
+                
+                // The revealer has at least one of these cards
+                if (revealedCard) {
+                    // We know exactly which card they revealed
+                    setGridState(revealedCard, revealer, 1); // has
+                    // They don't have the other cards
+                    suggestedCards.forEach(card => {
+                        if (card !== revealedCard) {
+                            setGridState(card, revealer, -1); // doesn't have
+                        }
+                    });
+                } else {
+                    // We don't know which card, but they have at least one
+                    suggestedCards.forEach(card => {
+                        if (grid[card] && grid[card][revealer] === -1) {
+                            // Already marked as doesn't have, leave it
+                        } else if (grid[card] && grid[card][revealer] === 1) {
+                            // Already marked as has, leave it
+                        } else {
+                            // Mark as maybe
+                            setGridState(card, revealer, 2);
+                        }
+                    });
+                }
+            }
+            
+            // Run elimination logic
+            runEliminationLogic();
+            
+            // Update displays
+            updateDetectiveSheet();
+            updateHistory();
+            checkForSolution();
+            updateURL();
+        }
+
+        function setGridState(card, player, state) {
+            if (!grid[card]) {
+                grid[card] = {};
+            }
+            grid[card][player] = state;
+        }
+
+        function runEliminationLogic() {
+            let changed = true;
+            while (changed) {
+                changed = false;
+                
+                // For each card, if only one player can have it, mark them as having it
+                Object.keys(grid).forEach(card => {
+                    const possiblePlayers = players.filter(player => 
+                        grid[card][player] === 0 || grid[card][player] === 1 || grid[card][player] === 2
+                    );
+                    
+                    const definitelyHas = players.filter(player => grid[card][player] === 1);
+                    const maybeHas = players.filter(player => grid[card][player] === 2);
+                    const unknown = players.filter(player => grid[card][player] === 0);
+                    
+                    if (definitelyHas.length === 0 && maybeHas.length === 1 && unknown.length === 0) {
+                        // Only one player might have it, so they must have it
+                        setGridState(card, maybeHas[0], 1);
+                        changed = true;
+                    } else if (definitelyHas.length === 0 && maybeHas.length === 0 && unknown.length === 1) {
+                        // Only one player could have it, so they must have it
+                        setGridState(card, unknown[0], 1);
+                        changed = true;
+                    }
+                });
+                
+                // If a player has a card, they don't have the others in suggestions where they revealed
+                suggestions.forEach(suggestion => {
+                    if (suggestion.revealedCard) return; // Skip if we know the exact card
+                    
+                    const { cards, revealer } = suggestion;
+                    const hasCards = cards.filter(card => grid[card] && grid[card][revealer] === 1);
+                    
+                    if (hasCards.length === 1) {
+                        // They have exactly one of the suggested cards, so they don't have the others
+                        cards.forEach(card => {
+                            if (card !== hasCards[0] && grid[card] && grid[card][revealer] === 2) {
+                                setGridState(card, revealer, -1);
+                                changed = true;
+                            }
+                        });
+                    }
+                });
+            }
+        }
+
+        function updateRevealedCardOptions() {
+            const revealedCardSelect = document.getElementById('revealedCard');
+            const person = document.getElementById('suggestedPerson').value;
+            const weapon = document.getElementById('suggestedWeapon').value;
+            const room = document.getElementById('suggestedRoom').value;
+            
+            // Clear options
+            revealedCardSelect.innerHTML = '<option value="">Unknown card</option>';
+            
+            // Add current suggestion cards
+            [person, weapon, room].forEach(card => {
+                if (card) {
+                    const option = document.createElement('option');
+                    option.value = card;
+                    option.textContent = card;
+                    revealedCardSelect.appendChild(option);
+                }
+            });
+        }
+
+        // Update revealed card options when suggestion changes
+        ['suggestedPerson', 'suggestedWeapon', 'suggestedRoom'].forEach(id => {
+            document.getElementById(id).addEventListener('change', updateRevealedCardOptions);
+        });
+
+        function updateHistory() {
+            const historyDiv = document.getElementById('history');
+            historyDiv.innerHTML = '';
+            
+            suggestions.slice().reverse().forEach(suggestion => {
+                const historyItem = document.createElement('div');
+                historyItem.className = 'history-item';
+                
+                const revealText = suggestion.revealer === 'pass' ? 
+                    'Everyone passed' : 
+                    suggestion.revealedCard ? 
+                        `${suggestion.revealer} revealed ${suggestion.revealedCard}` :
+                        `${suggestion.revealer} revealed a card`;
+                
+                historyItem.innerHTML = `
+                    <strong>${suggestion.suggester}</strong> suggested: 
+                    <strong>${suggestion.cards.join(', ')}</strong><br>
+                    ${revealText}
+                `;
+                
+                historyDiv.appendChild(historyItem);
+            });
+        }
+
+        function checkForSolution() {
+            const solution = {
+                person: null,
+                weapon: null,
+                room: null
+            };
+            
+            // Check if we can determine the solution
+            ['people', 'weapons', 'rooms'].forEach(category => {
+                const categoryKey = category.slice(0, -1); // remove 's'
+                gameData[category].forEach(card => {
+                    const playersWhoHaveCard = players.filter(player => 
+                        grid[card] && grid[card][player] === 1
+                    );
+                    
+                    if (playersWhoHaveCard.length === 0) {
+                        // No player has this card, so it's in the solution
+                        solution[categoryKey] = card;
+                    }
+                });
+            });
+            
+            // Check if we have a complete solution
+            if (solution.person && solution.weapon && solution.room) {
+                showSolution(solution);
+            } else {
+                hideSolution();
+            }
+        }
+
+        function showSolution(solution) {
+            const solutionBox = document.getElementById('solutionBox');
+            const solutionContent = document.getElementById('solutionContent');
+            
+            solutionContent.innerHTML = `
+                <div><strong>Person:</strong> ${solution.person}</div>
+                <div><strong>Weapon:</strong> ${solution.weapon}</div>
+                <div><strong>Room:</strong> ${solution.room}</div>
+            `;
+            
+            solutionBox.classList.remove('hidden');
+        }
+
+        function hideSolution() {
+            const solutionBox = document.getElementById('solutionBox');
+            solutionBox.classList.add('hidden');
+        }
+
+        // Allow Enter key to add player
+        document.getElementById('playerName').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                addPlayer();
+            }
+        });
+
+        // Initialize the app
+        init();
+    </script>
+</body>
+</html>
