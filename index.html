@@ -277,6 +277,24 @@
             background-color: #f9f9f9;
             border-radius: 4px;
             border-left: 4px solid #8B4513;
+            position: relative;
+        }
+
+        .history-item .delete-btn {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            background: #f44336;
+            color: white;
+            border: none;
+            border-radius: 3px;
+            padding: 2px 6px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        .history-item .delete-btn:hover {
+            background: #d32f2f;
         }
     </style>
 </head>
@@ -939,7 +957,7 @@
             const historyDiv = document.getElementById('history');
             historyDiv.innerHTML = '';
             
-            suggestions.slice().reverse().forEach(suggestion => {
+            suggestions.slice().reverse().forEach((suggestion, reverseIndex) => {
                 const historyItem = document.createElement('div');
                 historyItem.className = 'history-item';
                 
@@ -959,7 +977,11 @@
                         `${suggestion.revealer} revealed ${suggestion.revealedCard}` :
                         `${suggestion.revealer} revealed a card`;
                 
+                // Calculate the actual index in the suggestions array (since we're reversed)
+                const actualIndex = suggestions.length - 1 - reverseIndex;
+                
                 historyItem.innerHTML = `
+                    <button class="delete-btn" onclick="deleteSuggestion(${actualIndex})">×</button>
                     <strong>${suggestion.suggester}</strong> suggested: 
                     <strong>${suggestion.cards.join(', ')}</strong><br>
                     ${passersText}${revealText}
@@ -967,6 +989,100 @@
                 
                 historyDiv.appendChild(historyItem);
             });
+        }
+
+        function deleteSuggestion(index) {
+            // Remove the suggestion at the specified index
+            suggestions.splice(index, 1);
+            
+            // Rebuild the game state from scratch
+            rebuildGameState();
+            
+            // Update all displays
+            updateDetectiveSheet();
+            updateHistory();
+            checkForSolution();
+            updateURL();
+        }
+
+        function rebuildGameState() {
+            // Reset grid to initial state for all players
+            players.forEach(player => {
+                resetGridForPlayer(player);
+            });
+            
+            // Replay all remaining suggestions in chronological order
+            suggestions.forEach(suggestion => {
+                replaySuggestion(suggestion);
+            });
+            
+            // Run elimination logic
+            runEliminationLogic();
+        }
+
+        function resetGridForPlayer(playerName) {
+            const allCards = [...gameData.people, ...gameData.weapons, ...gameData.rooms];
+            allCards.forEach(card => {
+                if (!grid[card]) {
+                    grid[card] = {};
+                }
+                grid[card][playerName] = 0; // reset to unknown
+            });
+        }
+
+        function replaySuggestion(suggestion) {
+            // This is a copy of the logic from processSuggestion, but without adding to history
+            const suggestedCards = suggestion.cards;
+            
+            // Process the suggestion logic
+            if (suggestion.revealer === 'pass') {
+                // Everyone passed - all other players don't have any of these cards
+                suggestedCards.forEach(card => {
+                    players.forEach(player => {
+                        if (player !== suggestion.suggester) {
+                            setGridState(card, player, -1); // doesn't have
+                        }
+                    });
+                });
+            } else {
+                // Someone revealed
+                const revealerIndex = players.indexOf(suggestion.revealer);
+                const suggesterIndex = players.indexOf(suggestion.suggester);
+                
+                // All players between suggester and revealer don't have any of these cards
+                let currentIndex = (suggesterIndex + 1) % players.length;
+                while (currentIndex !== revealerIndex) {
+                    const player = players[currentIndex];
+                    suggestedCards.forEach(card => {
+                        setGridState(card, player, -1); // doesn't have
+                    });
+                    currentIndex = (currentIndex + 1) % players.length;
+                }
+                
+                // The revealer has at least one of these cards
+                if (suggestion.revealedCard) {
+                    // We know exactly which card they revealed
+                    setGridState(suggestion.revealedCard, suggestion.revealer, 1); // has
+                    // They don't have the other cards
+                    suggestedCards.forEach(card => {
+                        if (card !== suggestion.revealedCard) {
+                            setGridState(card, suggestion.revealer, -1); // doesn't have
+                        }
+                    });
+                } else {
+                    // We don't know which card, but they have at least one
+                    suggestedCards.forEach(card => {
+                        if (grid[card] && grid[card][suggestion.revealer] === -1) {
+                            // Already marked as doesn't have, leave it
+                        } else if (grid[card] && grid[card][suggestion.revealer] === 1) {
+                            // Already marked as has, leave it
+                        } else {
+                            // Mark as maybe
+                            setGridState(card, suggestion.revealer, 2);
+                        }
+                    });
+                }
+            }
         }
 
         function checkForSolution() {
