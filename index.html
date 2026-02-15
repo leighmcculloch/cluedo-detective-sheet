@@ -1,0 +1,946 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cluedo Guess Card</title>
+    <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+    <style>
+        :root {
+            --bg: #1a1a2e;
+            --surface: #16213e;
+            --surface2: #0f3460;
+            --accent: #e94560;
+            --text: #e0e0e0;
+            --text-dim: #888;
+            --yes: #4caf50;
+            --no: #c62828;
+            --solution: #ffc107;
+            --suspect-hdr: #e94560;
+            --weapon-hdr: #2196f3;
+            --room-hdr: #4caf50;
+            --border: #2a2a4a;
+            --cell-hover: #1e2f50;
+        }
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            line-height: 1.4;
+        }
+        #app { max-width: 960px; margin: 0 auto; padding: 12px; }
+        h1 { font-size: 1.8rem; margin-bottom: 8px; }
+        h2 { font-size: 1.3rem; margin-bottom: 8px; }
+        h3 { font-size: 1.1rem; margin-bottom: 6px; }
+        .screen { display: none; }
+        .screen.active { display: block; }
+
+        /* Buttons */
+        button, .btn {
+            background: var(--surface2);
+            color: var(--text);
+            border: 1px solid var(--border);
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: background 0.15s;
+        }
+        button:hover { background: #1a4a80; }
+        .btn-primary { background: var(--accent); border-color: var(--accent); }
+        .btn-primary:hover { background: #c73650; }
+        .btn-small { padding: 4px 10px; font-size: 0.8rem; }
+        .btn-danger { background: var(--no); border-color: var(--no); }
+        .btn-danger:hover { background: #a12020; }
+
+        /* Start screen */
+        #start-screen { text-align: center; padding-top: 60px; }
+        #start-screen h1 { font-size: 2.4rem; margin-bottom: 4px; }
+        #start-screen .subtitle { color: var(--text-dim); margin-bottom: 32px; }
+        .start-buttons { display: flex; gap: 12px; justify-content: center; margin-bottom: 32px; }
+        .start-buttons button { padding: 12px 28px; font-size: 1.1rem; }
+        .saved-games { text-align: left; max-width: 400px; margin: 0 auto; }
+        .saved-game-item {
+            display: flex; justify-content: space-between; align-items: center;
+            background: var(--surface); padding: 10px 14px; border-radius: 6px;
+            margin-bottom: 6px; border: 1px solid var(--border);
+        }
+        .saved-game-item .info { cursor: pointer; flex: 1; }
+        .saved-game-item .info:hover { color: var(--solution); }
+        .saved-game-item .meta { color: var(--text-dim); font-size: 0.8rem; }
+
+        /* Setup screen */
+        #setup-screen { max-width: 520px; margin: 0 auto; padding-top: 20px; }
+        .form-group { margin-bottom: 14px; }
+        .form-group label { display: block; margin-bottom: 4px; font-weight: 600; font-size: 0.9rem; }
+        select, input[type="text"], input[type="number"] {
+            background: var(--surface);
+            color: var(--text);
+            border: 1px solid var(--border);
+            padding: 8px 10px;
+            border-radius: 4px;
+            font-size: 0.9rem;
+            width: 100%;
+        }
+        input[type="number"] { width: 60px; }
+        .player-row { display: flex; gap: 8px; align-items: center; margin-bottom: 6px; }
+        .player-row input[type="text"] { flex: 1; }
+        .player-row .card-count { color: var(--text-dim); font-size: 0.85rem; white-space: nowrap; }
+        .card-checkboxes { display: flex; flex-wrap: wrap; gap: 2px 12px; margin-bottom: 10px; }
+        .card-checkboxes label {
+            font-size: 0.85rem; cursor: pointer; padding: 2px 0;
+            display: flex; align-items: center; gap: 4px;
+        }
+        .card-checkboxes input[type="checkbox"] { accent-color: var(--accent); }
+        .category-label { font-weight: 700; font-size: 0.85rem; margin-top: 8px; margin-bottom: 2px; width: 100%; }
+        .category-label.suspect { color: var(--suspect-hdr); }
+        .category-label.weapon { color: var(--weapon-hdr); }
+        .category-label.room { color: var(--room-hdr); }
+        .setup-error { color: var(--accent); font-size: 0.85rem; margin-top: 4px; }
+
+        /* Game screen */
+        .game-header {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 10px; flex-wrap: wrap; gap: 6px;
+        }
+        .game-header .actions { display: flex; gap: 6px; }
+        .game-id { color: var(--text-dim); font-size: 0.8rem; }
+
+        /* Grid */
+        .grid-wrapper { overflow-x: auto; margin-bottom: 14px; }
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            min-width: 400px;
+            font-size: 0.85rem;
+        }
+        th, td {
+            border: 1px solid var(--border);
+            padding: 4px 8px;
+            text-align: center;
+            white-space: nowrap;
+        }
+        th {
+            background: var(--surface);
+            font-weight: 700;
+            position: sticky;
+            top: 0;
+            z-index: 2;
+        }
+        th.player-col { min-width: 70px; font-size: 0.8rem; }
+        th.solution-col { background: #3e2e00; color: var(--solution); min-width: 70px; }
+        td.card-name {
+            text-align: left;
+            font-weight: 500;
+            background: var(--surface);
+            position: sticky;
+            left: 0;
+            z-index: 1;
+            min-width: 120px;
+        }
+        tr.category-row td {
+            font-weight: 700;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            padding: 6px 8px;
+        }
+        tr.category-row.suspects td { background: #3e1020; color: var(--suspect-hdr); }
+        tr.category-row.weapons td { background: #0a2540; color: var(--weapon-hdr); }
+        tr.category-row.rooms td { background: #0a3020; color: var(--room-hdr); }
+        td.cell {
+            cursor: pointer;
+            user-select: none;
+            transition: background 0.1s;
+            min-width: 50px;
+            font-size: 1rem;
+        }
+        td.cell:hover { background: var(--cell-hover); }
+        td.cell.yes { color: var(--yes); font-weight: 700; }
+        td.cell.no { color: var(--no); opacity: 0.7; font-size: 0.8rem; }
+        td.cell.maybe { color: var(--solution); font-size: 0.9rem; }
+        td.cell.deduced { opacity: 0.45; font-style: italic; }
+        td.solution-cell {
+            font-weight: 700;
+            min-width: 50px;
+        }
+        td.solution-cell.yes { color: var(--solution); background: #3e2e00; }
+        td.solution-cell.no { color: var(--text-dim); opacity: 0.4; }
+        .card-counts {
+            display: flex; gap: 4px; font-size: 0.75rem; color: var(--text-dim);
+            justify-content: center; margin-bottom: 6px; flex-wrap: wrap;
+        }
+        .card-counts span {
+            background: var(--surface); padding: 2px 8px; border-radius: 4px;
+            border: 1px solid var(--border);
+        }
+        .card-counts .full { color: var(--yes); border-color: var(--yes); }
+
+        /* Constraints list */
+        .constraints-section { margin-top: 14px; }
+        .constraint-item {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 8px 12px;
+            margin-bottom: 6px;
+            font-size: 0.85rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .constraint-item.resolved { opacity: 0.5; }
+        .constraint-cards { color: var(--solution); }
+
+        /* Modal */
+        .modal-overlay {
+            display: none;
+            position: fixed; inset: 0;
+            background: rgba(0,0,0,0.7);
+            z-index: 100;
+            justify-content: center;
+            align-items: flex-start;
+            padding-top: 40px;
+            overflow-y: auto;
+        }
+        .modal-overlay.active { display: flex; }
+        .modal {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 20px;
+            width: 90%;
+            max-width: 440px;
+            margin-bottom: 40px;
+        }
+        .modal h3 { margin-bottom: 14px; }
+        .modal .form-group { margin-bottom: 12px; }
+        .modal .form-group select { width: 100%; }
+        .modal .pass-checks { display: flex; flex-wrap: wrap; gap: 4px 14px; }
+        .modal .pass-checks label { font-size: 0.85rem; cursor: pointer; display: flex; align-items: center; gap: 4px; }
+        .modal .radio-group label { display: block; margin-bottom: 4px; font-size: 0.85rem; cursor: pointer; }
+        .modal .radio-group label { display: flex; align-items: center; gap: 6px; }
+        .modal .actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
+        .modal .sub-section { margin-left: 12px; margin-top: 6px; padding-left: 10px; border-left: 2px solid var(--border); }
+    </style>
+</head>
+<body>
+<div id="app">
+    <!-- ===== Start Screen ===== -->
+    <div id="start-screen" class="screen active">
+        <h1>Cluedo Guess Card</h1>
+        <p class="subtitle">Track cards and deduce the solution</p>
+        <div class="start-buttons">
+            <button class="btn-primary" hx-on:click="showSetup()">New Game</button>
+        </div>
+        <div class="saved-games" id="saved-games"></div>
+    </div>
+
+    <!-- ===== Setup Screen ===== -->
+    <div id="setup-screen" class="screen">
+        <h2>New Game</h2>
+        <div class="form-group">
+            <label>Number of players</label>
+            <select id="num-players" hx-on:change="updateSetupPlayers()">
+                <option value="3">3</option>
+                <option value="4">4</option>
+                <option value="5">5</option>
+                <option value="6">6</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>Player names</label>
+            <div id="player-names-inputs"></div>
+        </div>
+        <div class="form-group">
+            <label>Your cards</label>
+            <div id="my-cards-selection"></div>
+            <div id="card-count-display" style="color:var(--text-dim);font-size:0.85rem;margin-top:4px;"></div>
+        </div>
+        <div id="setup-error" class="setup-error"></div>
+        <div style="display:flex;gap:8px;margin-top:16px;">
+            <button hx-on:click="showStart()">Back</button>
+            <button class="btn-primary" hx-on:click="startGame()">Start Game</button>
+        </div>
+    </div>
+
+    <!-- ===== Game Screen ===== -->
+    <div id="game-screen" class="screen">
+        <div class="game-header">
+            <div>
+                <h2>Cluedo Tracker</h2>
+                <div class="game-id" id="game-id-display"></div>
+            </div>
+            <div class="actions">
+                <button class="btn-small" hx-on:click="openSuggestionModal()">Record Suggestion</button>
+                <button class="btn-small" hx-on:click="saveGame()">Save</button>
+                <button class="btn-small" hx-on:click="showStart()">Menu</button>
+            </div>
+        </div>
+        <div id="card-counts-display" class="card-counts"></div>
+        <div class="grid-wrapper">
+            <table id="game-grid"></table>
+        </div>
+        <div class="constraints-section">
+            <h3>Recorded Suggestions</h3>
+            <div id="constraints-list"></div>
+        </div>
+    </div>
+
+    <!-- ===== Suggestion Modal ===== -->
+    <div id="suggestion-modal" class="modal-overlay">
+        <div class="modal">
+            <h3>Record a Suggestion</h3>
+            <div class="form-group">
+                <label>Suspect suggested</label>
+                <select id="sug-suspect"></select>
+            </div>
+            <div class="form-group">
+                <label>Weapon suggested</label>
+                <select id="sug-weapon"></select>
+            </div>
+            <div class="form-group">
+                <label>Room suggested</label>
+                <select id="sug-room"></select>
+            </div>
+            <div class="form-group">
+                <label>Players who PASSED (couldn't show any card)</label>
+                <div class="pass-checks" id="sug-passed"></div>
+            </div>
+            <div class="form-group">
+                <label>Who showed a card?</label>
+                <select id="sug-shower" hx-on:change="updateShowerSection()"></select>
+            </div>
+            <div id="sug-shown-section" class="form-group" style="display:none;">
+                <label>Did you see the card?</label>
+                <div class="radio-group">
+                    <label><input type="radio" name="sug-saw" value="yes" hx-on:change="updateSawSection()"> Yes, I saw it</label>
+                    <label><input type="radio" name="sug-saw" value="no" hx-on:change="updateSawSection()" checked> No, I didn't see it</label>
+                </div>
+                <div id="sug-which-card" class="sub-section" style="display:none;">
+                    <label>Which card?</label>
+                    <div class="radio-group" id="sug-card-options"></div>
+                </div>
+            </div>
+            <div class="actions">
+                <button hx-on:click="closeSuggestionModal()">Cancel</button>
+                <button class="btn-primary" hx-on:click="submitSuggestion()">Record</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// ===== CONSTANTS =====
+const SUSPECTS = ['Miss Scarlet', 'Colonel Mustard', 'Mrs White', 'Reverend Green', 'Mrs Peacock', 'Professor Plum'];
+const WEAPONS = ['Candlestick', 'Knife', 'Lead Pipe', 'Revolver', 'Rope', 'Wrench'];
+const ROOMS = ['Kitchen', 'Ballroom', 'Conservatory', 'Billiard Room', 'Library', 'Study', 'Hall', 'Lounge', 'Dining Room'];
+const ALL_CARDS = [...SUSPECTS, ...WEAPONS, ...ROOMS];
+const CATEGORIES = [
+    { name: 'Suspects', cards: SUSPECTS, cls: 'suspects' },
+    { name: 'Weapons', cards: WEAPONS, cls: 'weapons' },
+    { name: 'Rooms', cards: ROOMS, cls: 'rooms' },
+];
+const TOTAL_CARDS = 21;
+const SOLUTION_CARDS = 3;
+const DEALT_CARDS = TOTAL_CARDS - SOLUTION_CARDS;
+const STORAGE_PREFIX = 'cluedo_';
+
+// ===== GAME STATE =====
+let game = null;
+
+// ===== SCREEN MANAGEMENT =====
+function showScreen(id) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+}
+
+function showStart() {
+    showScreen('start-screen');
+    renderSavedGames();
+}
+
+function showSetup() {
+    showScreen('setup-screen');
+    updateSetupPlayers();
+    renderCardSelection();
+}
+
+// ===== SETUP =====
+function updateSetupPlayers() {
+    const n = parseInt(document.getElementById('num-players').value);
+    const container = document.getElementById('player-names-inputs');
+    const existing = container.querySelectorAll('input[type="text"]');
+    const names = [];
+    existing.forEach((inp, i) => names.push(inp.value));
+
+    let html = '';
+    for (let i = 0; i < n; i++) {
+        const defaultName = i === 0 ? 'Me' : `Player ${i + 1}`;
+        const val = names[i] || defaultName;
+        html += `<div class="player-row">
+            <span style="color:var(--text-dim);width:18px;">${i + 1}.</span>
+            <input type="text" value="${val}" data-player="${i}">
+        </div>`;
+    }
+    container.innerHTML = html;
+}
+
+function renderCardSelection() {
+    const container = document.getElementById('my-cards-selection');
+    let html = '';
+    for (const cat of CATEGORIES) {
+        const cls = cat.cls.slice(0, -1);
+        html += `<div class="category-label ${cls}">${cat.name}</div>`;
+        html += '<div class="card-checkboxes">';
+        for (const card of cat.cards) {
+            html += `<label><input type="checkbox" value="${card}" onchange="updateCardCount()"> ${card}</label>`;
+        }
+        html += '</div>';
+    }
+    container.innerHTML = html;
+    updateCardCount();
+}
+
+function updateCardCount() {
+    const checked = document.querySelectorAll('#my-cards-selection input[type="checkbox"]:checked');
+    const n = parseInt(document.getElementById('num-players').value);
+    const myCount = checked.length;
+    const remaining = DEALT_CARDS - myCount;
+    const perOther = Math.floor(remaining / (n - 1));
+    const extra = remaining % (n - 1);
+    document.getElementById('card-count-display').textContent =
+        `You: ${myCount} cards | Others: ${perOther}${extra > 0 ? '-' + (perOther + 1) : ''} cards each`;
+}
+
+function startGame() {
+    const n = parseInt(document.getElementById('num-players').value);
+    const nameInputs = document.querySelectorAll('#player-names-inputs input[type="text"]');
+    const players = [];
+    nameInputs.forEach((inp, i) => {
+        players.push({ name: inp.value.trim() || `Player ${i + 1}` });
+    });
+
+    const checked = document.querySelectorAll('#my-cards-selection input[type="checkbox"]:checked');
+    const myCards = Array.from(checked).map(cb => cb.value);
+    if (myCards.length === 0) {
+        document.getElementById('setup-error').textContent = 'Select at least your cards to start.';
+        return;
+    }
+
+    // Compute card counts
+    const remaining = DEALT_CARDS - myCards.length;
+    const perOther = Math.floor(remaining / (n - 1));
+    const extraCount = remaining % (n - 1);
+    players[0].cardCount = myCards.length;
+    for (let i = 1; i < n; i++) {
+        players[i].cardCount = perOther + (i - 1 < extraCount ? 1 : 0);
+    }
+
+    // Initialize game state
+    const grid = {};
+    const solution = {};
+    for (const card of ALL_CARDS) {
+        grid[card] = {};
+        for (let i = 0; i < n; i++) {
+            grid[card][i] = 'unknown';
+        }
+        solution[card] = 'unknown';
+    }
+
+    // Set up user marks for my cards
+    const userMarks = {};
+    for (const card of myCards) {
+        userMarks[card] = { 0: 'yes' };
+    }
+
+    game = {
+        id: generateGameId(),
+        createdAt: Date.now(),
+        players,
+        grid,
+        solution,
+        constraints: [],
+        userMarks,
+        myPlayerIndex: 0,
+    };
+
+    rebuildGrid();
+    document.getElementById('setup-error').textContent = '';
+    showGame();
+}
+
+// ===== GAME ID =====
+function generateGameId() {
+    return Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+}
+
+// ===== DEDUCTION ENGINE =====
+function propagate() {
+    if (!game) return;
+    const { grid, solution, players, constraints } = game;
+    const n = players.length;
+    let changed = true;
+    let iterations = 0;
+
+    while (changed && iterations < 100) {
+        changed = false;
+        iterations++;
+
+        // Rule 1: If someone has a card, no one else does, and it's not the solution
+        for (const card of ALL_CARDS) {
+            for (let p = 0; p < n; p++) {
+                if (grid[card][p] === 'yes') {
+                    for (let q = 0; q < n; q++) {
+                        if (q !== p && grid[card][q] !== 'no') {
+                            grid[card][q] = 'no';
+                            changed = true;
+                        }
+                    }
+                    if (solution[card] !== 'no') {
+                        solution[card] = 'no';
+                        changed = true;
+                    }
+                }
+            }
+        }
+
+        // Rule 2: If all players don't have a card, it's the solution
+        for (const card of ALL_CARDS) {
+            if (solution[card] === 'unknown') {
+                const allNo = Array.from({ length: n }, (_, i) => i).every(p => grid[card][p] === 'no');
+                if (allNo) {
+                    solution[card] = 'yes';
+                    changed = true;
+                }
+            }
+        }
+
+        // Rule 3: If a card is the solution, no player has it
+        for (const card of ALL_CARDS) {
+            if (solution[card] === 'yes') {
+                for (let p = 0; p < n; p++) {
+                    if (grid[card][p] !== 'no') {
+                        grid[card][p] = 'no';
+                        changed = true;
+                    }
+                }
+            }
+        }
+
+        // Rule 4: Category solution deduction - exactly one card per category is the solution
+        for (const cat of CATEGORIES) {
+            const cards = cat.cards;
+            const solutionYes = cards.filter(c => solution[c] === 'yes');
+            const solutionNo = cards.filter(c => solution[c] === 'no');
+            const solutionUnknown = cards.filter(c => solution[c] === 'unknown');
+
+            // If one card is confirmed solution, all others in category are not
+            if (solutionYes.length === 1) {
+                for (const c of cards) {
+                    if (c !== solutionYes[0] && solution[c] !== 'no') {
+                        solution[c] = 'no';
+                        changed = true;
+                    }
+                }
+            }
+
+            // If all but one are eliminated, the remaining one is the solution
+            if (solutionUnknown.length === 1 && solutionYes.length === 0) {
+                solution[solutionUnknown[0]] = 'yes';
+                changed = true;
+            }
+        }
+
+        // Rule 5: Player card count constraints
+        for (let p = 0; p < n; p++) {
+            const maxCards = players[p].cardCount;
+            const yesCards = ALL_CARDS.filter(c => grid[c][p] === 'yes');
+            const unknownCards = ALL_CARDS.filter(c => grid[c][p] === 'unknown');
+
+            // If player has all their cards, remaining unknowns are 'no'
+            if (yesCards.length === maxCards) {
+                for (const c of unknownCards) {
+                    grid[c][p] = 'no';
+                    changed = true;
+                }
+            }
+
+            // If remaining slots exactly match remaining unknowns, they must all be 'yes'
+            const remainingSlots = maxCards - yesCards.length;
+            if (remainingSlots > 0 && unknownCards.length === remainingSlots) {
+                for (const c of unknownCards) {
+                    grid[c][p] = 'yes';
+                    changed = true;
+                }
+            }
+        }
+
+        // Rule 6: Mystery reveal constraints
+        for (const con of constraints) {
+            if (con.resolved) continue;
+            // Filter to cards still possible for this player
+            const possible = con.cards.filter(c => grid[c][con.playerIndex] !== 'no');
+            if (possible.length === 1) {
+                // Only one card left - player must have it
+                if (grid[possible[0]][con.playerIndex] !== 'yes') {
+                    grid[possible[0]][con.playerIndex] = 'yes';
+                    changed = true;
+                }
+                con.resolved = true;
+            } else if (possible.length === 0) {
+                // Contradiction - all cards eliminated
+                con.resolved = true;
+                con.error = true;
+            }
+            con.remaining = possible;
+        }
+    }
+}
+
+function rebuildGrid() {
+    if (!game) return;
+    const n = game.players.length;
+    // Reset grid and solution to unknown
+    for (const card of ALL_CARDS) {
+        for (let p = 0; p < n; p++) {
+            game.grid[card][p] = 'unknown';
+        }
+        game.solution[card] = 'unknown';
+    }
+    // Apply user marks
+    for (const card of ALL_CARDS) {
+        if (game.userMarks[card]) {
+            for (const p of Object.keys(game.userMarks[card])) {
+                game.grid[card][parseInt(p)] = game.userMarks[card][p];
+            }
+        }
+    }
+    // Reset constraint resolved states so they re-evaluate
+    for (const con of game.constraints) {
+        con.resolved = false;
+        con.error = false;
+        con.remaining = [...con.cards];
+    }
+    propagate();
+}
+
+// ===== CELL INTERACTION =====
+function cycleCell(card, playerIndex) {
+    if (!game) return;
+    const displayed = game.grid[card][playerIndex];
+    if (displayed === 'unknown') {
+        if (!game.userMarks[card]) game.userMarks[card] = {};
+        game.userMarks[card][playerIndex] = 'yes';
+    } else if (displayed === 'yes') {
+        if (!game.userMarks[card]) game.userMarks[card] = {};
+        game.userMarks[card][playerIndex] = 'no';
+    } else {
+        // 'no' -> clear user mark
+        if (game.userMarks[card]) {
+            delete game.userMarks[card][playerIndex];
+        }
+    }
+    rebuildGrid();
+    renderGrid();
+}
+
+// ===== SUGGESTION HANDLING =====
+function openSuggestionModal() {
+    if (!game) return;
+    const modal = document.getElementById('suggestion-modal');
+
+    // Populate dropdowns
+    populateSelect('sug-suspect', SUSPECTS);
+    populateSelect('sug-weapon', WEAPONS);
+    populateSelect('sug-room', ROOMS);
+
+    // Shower dropdown
+    let showerHtml = '<option value="-1">No one showed</option>';
+    game.players.forEach((p, i) => {
+        showerHtml += `<option value="${i}">${p.name}</option>`;
+    });
+    document.getElementById('sug-shower').innerHTML = showerHtml;
+
+    // Pass checkboxes
+    let passHtml = '';
+    game.players.forEach((p, i) => {
+        passHtml += `<label><input type="checkbox" value="${i}"> ${p.name}</label>`;
+    });
+    document.getElementById('sug-passed').innerHTML = passHtml;
+
+    // Reset state
+    document.getElementById('sug-shown-section').style.display = 'none';
+    document.getElementById('sug-which-card').style.display = 'none';
+    document.querySelector('input[name="sug-saw"][value="no"]').checked = true;
+
+    modal.classList.add('active');
+}
+
+function closeSuggestionModal() {
+    document.getElementById('suggestion-modal').classList.remove('active');
+}
+
+function updateShowerSection() {
+    const val = document.getElementById('sug-shower').value;
+    const section = document.getElementById('sug-shown-section');
+    section.style.display = val === '-1' ? 'none' : '';
+
+    if (val !== '-1') {
+        updateSawSection();
+    }
+}
+
+function updateSawSection() {
+    const saw = document.querySelector('input[name="sug-saw"]:checked');
+    const whichSection = document.getElementById('sug-which-card');
+    if (saw && saw.value === 'yes') {
+        whichSection.style.display = '';
+        // Populate card options
+        const suspect = document.getElementById('sug-suspect').value;
+        const weapon = document.getElementById('sug-weapon').value;
+        const room = document.getElementById('sug-room').value;
+        let html = '';
+        for (const card of [suspect, weapon, room]) {
+            html += `<label><input type="radio" name="sug-card" value="${card}"> ${card}</label>`;
+        }
+        document.getElementById('sug-card-options').innerHTML = html;
+    } else {
+        whichSection.style.display = 'none';
+    }
+}
+
+function submitSuggestion() {
+    if (!game) return;
+    const suspect = document.getElementById('sug-suspect').value;
+    const weapon = document.getElementById('sug-weapon').value;
+    const room = document.getElementById('sug-room').value;
+    const suggestedCards = [suspect, weapon, room];
+
+    // Process passes - mark in userMarks so rebuilds preserve them
+    const passedBoxes = document.querySelectorAll('#sug-passed input[type="checkbox"]:checked');
+    for (const cb of passedBoxes) {
+        const pIdx = parseInt(cb.value);
+        for (const card of suggestedCards) {
+            if (!game.userMarks[card]) game.userMarks[card] = {};
+            game.userMarks[card][pIdx] = 'no';
+        }
+    }
+
+    // Process shower
+    const showerIdx = parseInt(document.getElementById('sug-shower').value);
+    if (showerIdx >= 0) {
+        const saw = document.querySelector('input[name="sug-saw"]:checked');
+        if (saw && saw.value === 'yes') {
+            const shownCard = document.querySelector('input[name="sug-card"]:checked');
+            if (shownCard) {
+                if (!game.userMarks[shownCard.value]) game.userMarks[shownCard.value] = {};
+                game.userMarks[shownCard.value][showerIdx] = 'yes';
+            }
+        } else {
+            // Add constraint: shower has at least one of the suggested cards
+            game.constraints.push({
+                playerIndex: showerIdx,
+                cards: [...suggestedCards],
+                remaining: [...suggestedCards],
+                resolved: false,
+                error: false,
+            });
+        }
+    }
+
+    rebuildGrid();
+    renderGrid();
+    renderConstraints();
+    closeSuggestionModal();
+}
+
+function populateSelect(id, options) {
+    let html = '';
+    for (const opt of options) {
+        html += `<option value="${opt}">${opt}</option>`;
+    }
+    document.getElementById(id).innerHTML = html;
+}
+
+function removeConstraint(index) {
+    if (!game) return;
+    game.constraints.splice(index, 1);
+    rebuildGrid();
+    renderGrid();
+    renderConstraints();
+}
+
+// ===== RENDERING =====
+function showGame() {
+    showScreen('game-screen');
+    document.getElementById('game-id-display').textContent = `Game: ${game.id}`;
+    renderGrid();
+    renderConstraints();
+}
+
+function renderGrid() {
+    if (!game) return;
+    const { players, grid, solution } = game;
+    const n = players.length;
+
+    // Card counts display
+    let countsHtml = '';
+    for (let p = 0; p < n; p++) {
+        const yesCount = ALL_CARDS.filter(c => grid[c][p] === 'yes').length;
+        const full = yesCount === players[p].cardCount;
+        countsHtml += `<span class="${full ? 'full' : ''}">${players[p].name}: ${yesCount}/${players[p].cardCount}</span>`;
+    }
+    document.getElementById('card-counts-display').innerHTML = countsHtml;
+
+    // Build table
+    let html = '<thead><tr><th class="card-name">Card</th>';
+    for (let p = 0; p < n; p++) {
+        html += `<th class="player-col">${players[p].name}</th>`;
+    }
+    html += '<th class="solution-col">Solution</th></tr></thead><tbody>';
+
+    for (const cat of CATEGORIES) {
+        html += `<tr class="category-row ${cat.cls}"><td colspan="${n + 2}">${cat.name}</td></tr>`;
+        for (const card of cat.cards) {
+            html += `<tr><td class="card-name">${card}</td>`;
+            for (let p = 0; p < n; p++) {
+                const state = grid[card][p];
+                const display = state === 'yes' ? '\u2713' : state === 'no' ? '\u2717' : '';
+                const cls = state === 'yes' ? 'yes' : state === 'no' ? 'no' : '';
+                // Check if this card is in an active constraint for this player
+                const inConstraint = game.constraints.some(con =>
+                    !con.resolved && con.playerIndex === p && con.remaining && con.remaining.includes(card)
+                );
+                const isUserSet = game.userMarks[card] && game.userMarks[card][p] !== undefined;
+                const deducedCls = (!isUserSet && state !== 'unknown') ? ' deduced' : '';
+                const maybeCls = (inConstraint && state === 'unknown') ? ' maybe' : '';
+                const maybeDisplay = (inConstraint && state === 'unknown') ? '?' : display;
+                html += `<td class="cell ${cls}${deducedCls}${maybeCls}" onclick="cycleCell('${card.replace(/'/g, "\\'")}', ${p})">${maybeDisplay}</td>`;
+            }
+            // Solution cell
+            const solState = solution[card];
+            const solDisplay = solState === 'yes' ? '\u2605' : solState === 'no' ? '\u2717' : '';
+            const solCls = solState === 'yes' ? 'yes' : solState === 'no' ? 'no' : '';
+            html += `<td class="solution-cell ${solCls}">${solDisplay}</td>`;
+            html += '</tr>';
+        }
+    }
+    html += '</tbody>';
+    document.getElementById('game-grid').innerHTML = html;
+}
+
+function renderConstraints() {
+    if (!game) return;
+    const container = document.getElementById('constraints-list');
+    if (game.constraints.length === 0) {
+        container.innerHTML = '<p style="color:var(--text-dim);font-size:0.85rem;">No suggestions recorded yet.</p>';
+        return;
+    }
+    let html = '';
+    game.constraints.forEach((con, i) => {
+        const playerName = game.players[con.playerIndex].name;
+        const remaining = con.remaining || con.cards;
+        const status = con.resolved
+            ? (con.error ? ' (contradiction!)' : ' (resolved)')
+            : ` (${remaining.length} remaining)`;
+        html += `<div class="constraint-item${con.resolved ? ' resolved' : ''}">
+            <div>
+                <strong>${playerName}</strong> showed one of:
+                <span class="constraint-cards">${con.cards.join(', ')}</span>
+                <span style="color:var(--text-dim)">${status}</span>
+            </div>
+            <button class="btn-small btn-danger" onclick="removeConstraint(${i})">Del</button>
+        </div>`;
+    });
+    container.innerHTML = html;
+}
+
+// ===== PERSISTENCE =====
+function saveGame() {
+    if (!game) return;
+    game.savedAt = Date.now();
+    localStorage.setItem(STORAGE_PREFIX + game.id, JSON.stringify(game));
+    renderSavedGames();
+    // Brief visual feedback
+    const btn = document.querySelector('.game-header .actions button:nth-child(2)');
+    if (btn) {
+        const orig = btn.textContent;
+        btn.textContent = 'Saved!';
+        setTimeout(() => btn.textContent = orig, 1200);
+    }
+}
+
+function loadGame(id) {
+    const data = localStorage.getItem(STORAGE_PREFIX + id);
+    if (!data) return;
+    game = JSON.parse(data);
+    // Backwards compatibility: build userMarks from grid if missing
+    if (!game.userMarks) {
+        game.userMarks = {};
+        for (const card of ALL_CARDS) {
+            for (let p = 0; p < game.players.length; p++) {
+                if (game.grid[card] && game.grid[card][p] && game.grid[card][p] !== 'unknown') {
+                    if (!game.userMarks[card]) game.userMarks[card] = {};
+                    game.userMarks[card][p] = game.grid[card][p];
+                }
+            }
+        }
+    }
+    rebuildGrid();
+    showGame();
+}
+
+function deleteGameSave(id) {
+    localStorage.removeItem(STORAGE_PREFIX + id);
+    renderSavedGames();
+}
+
+function listSavedGames() {
+    const games = [];
+    for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key.startsWith(STORAGE_PREFIX)) {
+            try {
+                const data = JSON.parse(localStorage.getItem(key));
+                games.push(data);
+            } catch (e) { /* skip corrupt entries */ }
+        }
+    }
+    games.sort((a, b) => (b.savedAt || b.createdAt) - (a.savedAt || a.createdAt));
+    return games;
+}
+
+function renderSavedGames() {
+    const games = listSavedGames();
+    const container = document.getElementById('saved-games');
+    if (games.length === 0) {
+        container.innerHTML = '';
+        return;
+    }
+    let html = '<h3>Saved Games</h3>';
+    for (const g of games) {
+        const date = new Date(g.savedAt || g.createdAt).toLocaleString();
+        const playerNames = g.players.map(p => p.name).join(', ');
+        html += `<div class="saved-game-item">
+            <div class="info" onclick="loadGame('${g.id}')">
+                <div>${g.id}</div>
+                <div class="meta">${playerNames} &middot; ${date}</div>
+            </div>
+            <button class="btn-small btn-danger" onclick="deleteGameSave('${g.id}')">Del</button>
+        </div>`;
+    }
+    container.innerHTML = html;
+}
+
+// ===== INIT =====
+function init() {
+    renderSavedGames();
+}
+
+document.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>
