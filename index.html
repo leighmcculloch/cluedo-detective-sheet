@@ -243,7 +243,7 @@
         <h2>New Game</h2>
         <div class="form-group">
             <label>Number of players</label>
-            <select id="num-players" hx-on:change="updateSetupPlayers()">
+            <select id="num-players" hx-on:change="updateSetupPlayers(); updateCardCount()">
                 <option value="3">3</option>
                 <option value="4">4</option>
                 <option value="5">5</option>
@@ -334,14 +334,14 @@
 
 <script>
 // ===== CONSTANTS =====
-const SUSPECTS = ['Miss Scarlet', 'Colonel Mustard', 'Mrs White', 'Reverend Green', 'Mrs Peacock', 'Professor Plum'];
-const WEAPONS = ['Candlestick', 'Knife', 'Lead Pipe', 'Revolver', 'Rope', 'Wrench'];
-const ROOMS = ['Kitchen', 'Ballroom', 'Conservatory', 'Billiard Room', 'Library', 'Study', 'Hall', 'Lounge', 'Dining Room'];
+const SUSPECTS = ['Green', 'Mustard', 'Peacock', 'Plum', 'Scarlett', 'White'];
+const WEAPONS = ['Candlestick', 'Dagger', 'Lead Pipe', 'Revolver', 'Rope', 'Wrench'];
+const ROOMS = ['Ballroom', 'Billiard Room', 'Conservatory', 'Dining Room', 'Hall', 'Kitchen', 'Library', 'Lounge', 'Study'];
 const ALL_CARDS = [...SUSPECTS, ...WEAPONS, ...ROOMS];
 const CATEGORIES = [
-    { name: 'Suspects', cards: SUSPECTS, cls: 'suspects' },
-    { name: 'Weapons', cards: WEAPONS, cls: 'weapons' },
-    { name: 'Rooms', cards: ROOMS, cls: 'rooms' },
+    { name: 'Who', cards: SUSPECTS, cls: 'suspects' },
+    { name: 'What', cards: WEAPONS, cls: 'weapons' },
+    { name: 'Where', cards: ROOMS, cls: 'rooms' },
 ];
 const TOTAL_CARDS = 21;
 const SOLUTION_CARDS = 3;
@@ -530,6 +530,22 @@ function propagate() {
             }
         }
 
+        // Rule 3b: If solution is 'no' and all but one player is 'no', that player has it
+        for (const card of ALL_CARDS) {
+            if (solution[card] === 'no') {
+                const unknownPlayers = [];
+                let hasYes = false;
+                for (let p = 0; p < n; p++) {
+                    if (grid[card][p] === 'yes') hasYes = true;
+                    if (grid[card][p] === 'unknown') unknownPlayers.push(p);
+                }
+                if (!hasYes && unknownPlayers.length === 1) {
+                    grid[card][unknownPlayers[0]] = 'yes';
+                    changed = true;
+                }
+            }
+        }
+
         // Rule 4: Category solution deduction - exactly one card per category is the solution
         for (const cat of CATEGORIES) {
             const cards = cat.cards;
@@ -630,18 +646,15 @@ function rebuildGrid() {
 // ===== CELL INTERACTION =====
 function cycleCell(card, playerIndex) {
     if (!game) return;
-    const displayed = game.grid[card][playerIndex];
-    if (displayed === 'unknown') {
+    const currentMark = (game.userMarks[card] && game.userMarks[card][playerIndex]) || null;
+    if (currentMark === null) {
         if (!game.userMarks[card]) game.userMarks[card] = {};
         game.userMarks[card][playerIndex] = 'yes';
-    } else if (displayed === 'yes') {
-        if (!game.userMarks[card]) game.userMarks[card] = {};
+    } else if (currentMark === 'yes') {
         game.userMarks[card][playerIndex] = 'no';
     } else {
         // 'no' -> clear user mark
-        if (game.userMarks[card]) {
-            delete game.userMarks[card][playerIndex];
-        }
+        delete game.userMarks[card][playerIndex];
     }
     rebuildGrid();
     renderGrid();
@@ -735,10 +748,12 @@ function submitSuggestion() {
         const saw = document.querySelector('input[name="sug-saw"]:checked');
         if (saw && saw.value === 'yes') {
             const shownCard = document.querySelector('input[name="sug-card"]:checked');
-            if (shownCard) {
-                if (!game.userMarks[shownCard.value]) game.userMarks[shownCard.value] = {};
-                game.userMarks[shownCard.value][showerIdx] = 'yes';
+            if (!shownCard) {
+                alert('Please select which card was shown.');
+                return;
             }
+            if (!game.userMarks[shownCard.value]) game.userMarks[shownCard.value] = {};
+            game.userMarks[shownCard.value][showerIdx] = 'yes';
         } else {
             // Add constraint: shower has at least one of the suggested cards
             game.constraints.push({
