@@ -162,6 +162,7 @@
         td.cell.no { color: var(--no); opacity: 0.7; font-size: 0.8rem; }
         td.cell.maybe { color: var(--solution); font-size: 0.9rem; }
         td.cell.deduced { opacity: 0.45; font-style: italic; }
+        th.me-col { text-decoration: underline; text-decoration-color: var(--accent); text-underline-offset: 3px; }
         td.solution-cell {
             font-weight: 700;
             min-width: 50px;
@@ -251,8 +252,12 @@
             </select>
         </div>
         <div class="form-group">
-            <label>Player names</label>
+            <label>Player names (in play order)</label>
             <div id="player-names-inputs"></div>
+        </div>
+        <div class="form-group">
+            <label>Which player are you?</label>
+            <select id="my-player-select"></select>
         </div>
         <div class="form-group">
             <label>Your cards</label>
@@ -294,35 +299,33 @@
         <div class="modal">
             <h3>Record a Suggestion</h3>
             <div class="form-group">
-                <label>Suspect suggested</label>
-                <select id="sug-suspect"></select>
+                <label>Who suggested?</label>
+                <select id="sug-suggester" hx-on:change="onSuggestionFormChange()"></select>
             </div>
             <div class="form-group">
-                <label>Weapon suggested</label>
-                <select id="sug-weapon"></select>
+                <label>Who</label>
+                <select id="sug-suspect" hx-on:change="onSuggestionFormChange()"></select>
             </div>
             <div class="form-group">
-                <label>Room suggested</label>
-                <select id="sug-room"></select>
+                <label>What</label>
+                <select id="sug-weapon" hx-on:change="onSuggestionFormChange()"></select>
             </div>
             <div class="form-group">
-                <label>Players who PASSED (couldn't show any card)</label>
-                <div class="pass-checks" id="sug-passed"></div>
+                <label>Where</label>
+                <select id="sug-room" hx-on:change="onSuggestionFormChange()"></select>
             </div>
             <div class="form-group">
-                <label>Who showed a card?</label>
-                <select id="sug-shower" hx-on:change="updateShowerSection()"></select>
+                <label>Result</label>
+                <select id="sug-result" hx-on:change="onSuggestionFormChange()"></select>
             </div>
-            <div id="sug-shown-section" class="form-group" style="display:none;">
-                <label>Did you see the card?</label>
-                <div class="radio-group">
-                    <label><input type="radio" name="sug-saw" value="yes" hx-on:change="updateSawSection()"> Yes, I saw it</label>
-                    <label><input type="radio" name="sug-saw" value="no" hx-on:change="updateSawSection()" checked> No, I didn't see it</label>
-                </div>
-                <div id="sug-which-card" class="sub-section" style="display:none;">
-                    <label>Which card?</label>
-                    <div class="radio-group" id="sug-card-options"></div>
-                </div>
+            <div id="sug-card-section" class="form-group" style="display:none;">
+                <label>Which card was shown?</label>
+                <div class="radio-group" id="sug-card-options"></div>
+            </div>
+            <div id="sug-pass-info" style="display:none;">
+                <p style="color:var(--text-dim);font-size:0.8rem;margin-top:2px;">
+                    Couldn't show: <span id="sug-auto-passed"></span>
+                </p>
             </div>
             <div class="actions">
                 <button hx-on:click="closeSuggestionModal()">Cancel</button>
@@ -378,7 +381,7 @@ function updateSetupPlayers() {
 
     let html = '';
     for (let i = 0; i < n; i++) {
-        const defaultName = i === 0 ? 'Me' : `Player ${i + 1}`;
+        const defaultName = `Player ${i + 1}`;
         const val = names[i] || defaultName;
         html += `<div class="player-row">
             <span style="color:var(--text-dim);width:18px;">${i + 1}.</span>
@@ -386,6 +389,23 @@ function updateSetupPlayers() {
         </div>`;
     }
     container.innerHTML = html;
+    updateMyPlayerSelect();
+}
+
+function updateMyPlayerSelect() {
+    const n = parseInt(document.getElementById('num-players').value);
+    const nameInputs = document.querySelectorAll('#player-names-inputs input[type="text"]');
+    const select = document.getElementById('my-player-select');
+    const currentVal = select.value;
+    let html = '';
+    for (let i = 0; i < n; i++) {
+        const name = (nameInputs[i] && nameInputs[i].value.trim()) || `Player ${i + 1}`;
+        html += `<option value="${i}">${name}</option>`;
+    }
+    select.innerHTML = html;
+    if (currentVal && parseInt(currentVal) < n) {
+        select.value = currentVal;
+    }
 }
 
 function renderCardSelection() {
@@ -430,13 +450,20 @@ function startGame() {
         return;
     }
 
+    // Which player am I?
+    const myPlayerIndex = parseInt(document.getElementById('my-player-select').value);
+
     // Compute card counts
     const remaining = DEALT_CARDS - myCards.length;
-    const perOther = Math.floor(remaining / (n - 1));
-    const extraCount = remaining % (n - 1);
-    players[0].cardCount = myCards.length;
-    for (let i = 1; i < n; i++) {
-        players[i].cardCount = perOther + (i - 1 < extraCount ? 1 : 0);
+    const otherCount = n - 1;
+    const perOther = Math.floor(remaining / otherCount);
+    const extraCount = remaining % otherCount;
+    players[myPlayerIndex].cardCount = myCards.length;
+    let extraIdx = 0;
+    for (let i = 0; i < n; i++) {
+        if (i === myPlayerIndex) continue;
+        players[i].cardCount = perOther + (extraIdx < extraCount ? 1 : 0);
+        extraIdx++;
     }
 
     // Initialize game state
@@ -453,7 +480,7 @@ function startGame() {
     // Set up user marks for my cards
     const userMarks = {};
     for (const card of myCards) {
-        userMarks[card] = { 0: 'yes' };
+        userMarks[card] = { [myPlayerIndex]: 'yes' };
     }
 
     game = {
@@ -464,7 +491,7 @@ function startGame() {
         solution,
         constraints: [],
         userMarks,
-        myPlayerIndex: 0,
+        myPlayerIndex,
     };
 
     rebuildGrid();
@@ -665,88 +692,136 @@ function openSuggestionModal() {
     if (!game) return;
     const modal = document.getElementById('suggestion-modal');
 
-    // Populate dropdowns
+    // Populate card dropdowns
     populateSelect('sug-suspect', SUSPECTS);
     populateSelect('sug-weapon', WEAPONS);
     populateSelect('sug-room', ROOMS);
 
-    // Shower dropdown
-    let showerHtml = '<option value="-1">No one showed</option>';
+    // Populate suggester dropdown with all players
+    let sugHtml = '';
     game.players.forEach((p, i) => {
-        showerHtml += `<option value="${i}">${p.name}</option>`;
+        sugHtml += `<option value="${i}">${p.name}</option>`;
     });
-    document.getElementById('sug-shower').innerHTML = showerHtml;
+    document.getElementById('sug-suggester').innerHTML = sugHtml;
 
-    // Pass checkboxes
-    let passHtml = '';
-    game.players.forEach((p, i) => {
-        passHtml += `<label><input type="checkbox" value="${i}"> ${p.name}</label>`;
-    });
-    document.getElementById('sug-passed').innerHTML = passHtml;
+    // Reset display sections
+    document.getElementById('sug-card-section').style.display = 'none';
+    document.getElementById('sug-pass-info').style.display = 'none';
 
-    // Reset state
-    document.getElementById('sug-shown-section').style.display = 'none';
-    document.getElementById('sug-which-card').style.display = 'none';
-    document.querySelector('input[name="sug-saw"][value="no"]').checked = true;
+    // Initialize result dropdown and dependent UI
+    onSuggestionFormChange();
 
     modal.classList.add('active');
+}
+
+function onSuggestionFormChange() {
+    if (!game) return;
+    const n = game.players.length;
+    const myIdx = game.myPlayerIndex;
+    const suggesterIdx = parseInt(document.getElementById('sug-suggester').value);
+    const resultSelect = document.getElementById('sug-result');
+    const currentResult = resultSelect.value;
+
+    // Rebuild result options: players in clockwise order from suggester, excluding suggester
+    let resultHtml = '';
+    for (let offset = 1; offset < n; offset++) {
+        const pIdx = (suggesterIdx + offset) % n;
+        resultHtml += `<option value="${pIdx}">${game.players[pIdx].name} showed</option>`;
+    }
+    resultHtml += '<option value="-1">No one could show</option>';
+    resultSelect.innerHTML = resultHtml;
+
+    // Try to preserve previous selection
+    if (currentResult && resultSelect.querySelector(`option[value="${currentResult}"]`)) {
+        resultSelect.value = currentResult;
+    }
+
+    // Update dependent UI based on current result
+    const resultVal = parseInt(resultSelect.value);
+    const cardSection = document.getElementById('sug-card-section');
+    const passInfo = document.getElementById('sug-pass-info');
+
+    if (resultVal === -1) {
+        // No one showed — all other players passed
+        cardSection.style.display = 'none';
+        const passedNames = [];
+        for (let offset = 1; offset < n; offset++) {
+            passedNames.push(game.players[(suggesterIdx + offset) % n].name);
+        }
+        document.getElementById('sug-auto-passed').textContent = passedNames.join(', ');
+        passInfo.style.display = '';
+    } else {
+        const showerIdx = resultVal;
+        // Compute who passed (clockwise from suggester+1 to shower, exclusive of shower)
+        const passedNames = [];
+        let current = (suggesterIdx + 1) % n;
+        while (current !== showerIdx) {
+            passedNames.push(game.players[current].name);
+            current = (current + 1) % n;
+        }
+        if (passedNames.length > 0) {
+            document.getElementById('sug-auto-passed').textContent = passedNames.join(', ');
+            passInfo.style.display = '';
+        } else {
+            passInfo.style.display = 'none';
+        }
+
+        // Show card selection if I'm the suggester (I saw the card) or the shower (I chose which to show)
+        if (myIdx === suggesterIdx || myIdx === showerIdx) {
+            const suspect = document.getElementById('sug-suspect').value;
+            const weapon = document.getElementById('sug-weapon').value;
+            const room = document.getElementById('sug-room').value;
+            let html = '';
+            for (const card of [suspect, weapon, room]) {
+                html += `<label><input type="radio" name="sug-card" value="${card}"> ${card}</label>`;
+            }
+            document.getElementById('sug-card-options').innerHTML = html;
+            cardSection.style.display = '';
+        } else {
+            cardSection.style.display = 'none';
+        }
+    }
 }
 
 function closeSuggestionModal() {
     document.getElementById('suggestion-modal').classList.remove('active');
 }
 
-function updateShowerSection() {
-    const val = document.getElementById('sug-shower').value;
-    const section = document.getElementById('sug-shown-section');
-    section.style.display = val === '-1' ? 'none' : '';
-
-    if (val !== '-1') {
-        updateSawSection();
-    }
-}
-
-function updateSawSection() {
-    const saw = document.querySelector('input[name="sug-saw"]:checked');
-    const whichSection = document.getElementById('sug-which-card');
-    if (saw && saw.value === 'yes') {
-        whichSection.style.display = '';
-        // Populate card options
-        const suspect = document.getElementById('sug-suspect').value;
-        const weapon = document.getElementById('sug-weapon').value;
-        const room = document.getElementById('sug-room').value;
-        let html = '';
-        for (const card of [suspect, weapon, room]) {
-            html += `<label><input type="radio" name="sug-card" value="${card}"> ${card}</label>`;
-        }
-        document.getElementById('sug-card-options').innerHTML = html;
-    } else {
-        whichSection.style.display = 'none';
-    }
-}
-
 function submitSuggestion() {
     if (!game) return;
+    const n = game.players.length;
+    const myIdx = game.myPlayerIndex;
+    const suggesterIdx = parseInt(document.getElementById('sug-suggester').value);
     const suspect = document.getElementById('sug-suspect').value;
     const weapon = document.getElementById('sug-weapon').value;
     const room = document.getElementById('sug-room').value;
     const suggestedCards = [suspect, weapon, room];
+    const resultVal = parseInt(document.getElementById('sug-result').value);
 
-    // Process passes - mark in userMarks so rebuilds preserve them
-    const passedBoxes = document.querySelectorAll('#sug-passed input[type="checkbox"]:checked');
-    for (const cb of passedBoxes) {
-        const pIdx = parseInt(cb.value);
-        for (const card of suggestedCards) {
-            if (!game.userMarks[card]) game.userMarks[card] = {};
-            game.userMarks[card][pIdx] = 'no';
+    if (resultVal === -1) {
+        // No one could show — every other player is marked 'no' for all 3 cards
+        for (let offset = 1; offset < n; offset++) {
+            const pIdx = (suggesterIdx + offset) % n;
+            for (const card of suggestedCards) {
+                if (!game.userMarks[card]) game.userMarks[card] = {};
+                game.userMarks[card][pIdx] = 'no';
+            }
         }
-    }
+    } else {
+        const showerIdx = resultVal;
+        // Auto-pass: mark players between suggester and shower (clockwise) as 'no'
+        let current = (suggesterIdx + 1) % n;
+        while (current !== showerIdx) {
+            for (const card of suggestedCards) {
+                if (!game.userMarks[card]) game.userMarks[card] = {};
+                game.userMarks[card][current] = 'no';
+            }
+            current = (current + 1) % n;
+        }
 
-    // Process shower
-    const showerIdx = parseInt(document.getElementById('sug-shower').value);
-    if (showerIdx >= 0) {
-        const saw = document.querySelector('input[name="sug-saw"]:checked');
-        if (saw && saw.value === 'yes') {
+        // Handle the shower's card
+        if (myIdx === suggesterIdx || myIdx === showerIdx) {
+            // I know which card — must be selected
             const shownCard = document.querySelector('input[name="sug-card"]:checked');
             if (!shownCard) {
                 alert('Please select which card was shown.');
@@ -755,7 +830,7 @@ function submitSuggestion() {
             if (!game.userMarks[shownCard.value]) game.userMarks[shownCard.value] = {};
             game.userMarks[shownCard.value][showerIdx] = 'yes';
         } else {
-            // Add constraint: shower has at least one of the suggested cards
+            // Mystery reveal — add constraint
             game.constraints.push({
                 playerIndex: showerIdx,
                 cards: [...suggestedCards],
@@ -813,7 +888,8 @@ function renderGrid() {
     // Build table
     let html = '<thead><tr><th class="card-name">Card</th>';
     for (let p = 0; p < n; p++) {
-        html += `<th class="player-col">${players[p].name}</th>`;
+        const meClass = (p === game.myPlayerIndex) ? ' me-col' : '';
+        html += `<th class="player-col${meClass}">${players[p].name}</th>`;
     }
     html += '<th class="solution-col">Solution</th></tr></thead><tbody>';
 
@@ -861,10 +937,30 @@ function renderConstraints() {
         const status = con.resolved
             ? (con.error ? ' (contradiction!)' : ' (resolved)')
             : ` (${remaining.length} remaining)`;
+
+        // Build card list with known-holder annotations
+        const cardParts = con.cards.map(card => {
+            // Check if any player has this card
+            let holder = null;
+            for (let p = 0; p < game.players.length; p++) {
+                if (game.grid[card][p] === 'yes') {
+                    holder = game.players[p].name;
+                    break;
+                }
+            }
+            if (!holder && game.solution[card] === 'yes') {
+                holder = 'Solution';
+            }
+            if (holder) {
+                return `<s>${card}</s> <span style="color:var(--text-dim)">[${holder}]</span>`;
+            }
+            return card;
+        });
+
         html += `<div class="constraint-item${con.resolved ? ' resolved' : ''}">
             <div>
                 <strong>${playerName}</strong> showed one of:
-                <span class="constraint-cards">${con.cards.join(', ')}</span>
+                <span class="constraint-cards">${cardParts.join(', ')}</span>
                 <span style="color:var(--text-dim)">${status}</span>
             </div>
             <button class="btn-small btn-danger" onclick="removeConstraint(${i})">Del</button>
@@ -892,7 +988,8 @@ function loadGame(id) {
     const data = localStorage.getItem(STORAGE_PREFIX + id);
     if (!data) return;
     game = JSON.parse(data);
-    // Backwards compatibility: build userMarks from grid if missing
+    // Backwards compatibility
+    if (game.myPlayerIndex === undefined) game.myPlayerIndex = 0;
     if (!game.userMarks) {
         game.userMarks = {};
         for (const card of ALL_CARDS) {
